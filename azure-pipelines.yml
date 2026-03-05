@@ -183,12 +183,12 @@ stages:
               FALCON_BASE_URL = "https://api.crowdstrike.com"
               FALCON_CONSOLE_URL = "https://falcon.crowdstrike.com"
 
-          # Console URLs for IaC detections
-          IAC_CONSOLE_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/detections"
-          IAC_CRITICAL_URL = f"{IAC_CONSOLE_URL}?severity=Critical"
-          IAC_HIGH_URL = f"{IAC_CONSOLE_URL}?severity=High"
-          IAC_MEDIUM_URL = f"{IAC_CONSOLE_URL}?severity=Medium"
-          IAC_LOW_URL = f"{IAC_CONSOLE_URL}?severity=Low"
+          # Console URLs for IaC detections with correct format
+          IAC_CONSOLE_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?page=1"
+          IAC_CRITICAL_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27Critical%27&page=1"
+          IAC_HIGH_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27High%27&page=1"
+          IAC_MEDIUM_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27Medium%27&page=1"
+          IAC_LOW_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27Low%27&page=1"
 
           def query_iac_detections():
               print("🔍 Querying IaC detections from Falcon API...")
