@@ -264,20 +264,6 @@ stages:
               pipeline_name = os.environ.get('BUILD_DEFINITIONNAME', 'N/A')
               repo_name = os.environ.get('BUILD_REPOSITORY_NAME', 'N/A')
 
-              # Calculate pass/fail status
-              if severity_counts.get('Critical', 0) > 0 or severity_counts.get('High', 0) > 0:
-                  scan_status = "FAILED"
-                  status_color = "#E01F27"
-                  status_icon = "❌"
-              elif severity_counts.get('Medium', 0) > 0:
-                  scan_status = "WARNING"
-                  status_color = "#FF6B00"
-                  status_icon = "⚠️"
-              else:
-                  scan_status = "PASSED"
-                  status_color = "#28a745"
-                  status_icon = "✅"
-
               html = f"""<!DOCTYPE html>
           <html lang="en">
           <head>
@@ -359,35 +345,6 @@ stages:
                   }}
 
                   .pipeline-badge strong {{ margin-left: 5px; }}
-
-                  /* Status Banner */
-                  .status-banner {{
-                      background: linear-gradient(135deg, {status_color} 0%, {status_color}dd 100%);
-                      color: white;
-                      padding: 20px 30px;
-                      border-radius: 10px;
-                      margin-bottom: 30px;
-                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                      display: flex;
-                      align-items: center;
-                      justify-content: space-between;
-                  }}
-
-                  .status-content {{
-                      display: flex;
-                      align-items: center;
-                      gap: 15px;
-                  }}
-
-                  .status-icon {{ font-size: 36px; }}
-
-                  .status-text h2 {{
-                      font-size: 24px;
-                      font-weight: 700;
-                      margin-bottom: 5px;
-                  }}
-
-                  .status-text p {{ opacity: 0.9; font-size: 14px; }}
 
                   /* Executive Summary */
                   .executive-summary {{
@@ -606,18 +563,7 @@ stages:
                               </div>
                           </div>
                           <div class="pipeline-badge">
-                              🔄 <strong>Pipeline:</strong> {pipeline_name} | <strong>Build:</strong> #{build_number}
-                          </div>
-                      </div>
-                  </div>
-
-                  <!-- Status Banner -->
-                  <div class="status-banner">
-                      <div class="status-content">
-                          <div class="status-icon">{status_icon}</div>
-                          <div class="status-text">
-                              <h2>Scan Status: {scan_status}</h2>
-                              <p>Scan Period: {date_range} | Report Generated: {report_time}</p>
+                              🔄 <strong>Pipeline:</strong> {pipeline_name} | <strong>Build:</strong> #{build_number} | <strong>Generated:</strong> {report_time}
                           </div>
                       </div>
                   </div>
@@ -794,7 +740,7 @@ stages:
                       <p><strong>Falcon Cloud Security (FCS)</strong> - Infrastructure as Code Security</p>
                       <p>Pre-Deployment IaC Scanning | Terraform | CloudFormation | Kubernetes</p>
                       <p style="margin-top: 15px;">Pipeline: <strong>{pipeline_name}</strong> | Build: <strong>#{build_number}</strong> | Build ID: <strong>{build_id}</strong></p>
-                      <p>Report Generated: <strong>{report_time}</strong></p>
+                      <p>Report Generated: <strong>{report_time}</strong> | Scan Period: <strong>{date_range}</strong></p>
                       <p style="margin-top: 15px; font-size: 11px;">We Stop Breaches | <a href="https://www.crowdstrike.com" style="color: #E01F27;">www.crowdstrike.com</a></p>
                   </div>
               </div>
