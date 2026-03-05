@@ -189,6 +189,7 @@ stages:
           IAC_HIGH_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27High%27&page=1"
           IAC_MEDIUM_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27Medium%27&page=1"
           IAC_LOW_URL = f"{FALCON_CONSOLE_URL}/cloud-security/iac/ng-detections?filter=severity%3A%27Low%27&page=1"
+          IAC_RULES_URL = f"{FALCON_CONSOLE_URL}/cloud-security/rego-policy-framework/rules"
 
           def query_iac_detections():
               print("🔍 Querying IaC detections from Falcon API...")
@@ -624,7 +625,7 @@ stages:
                               <div class="stat-label">Files Affected</div>
                               <div class="stat-value">{len(by_file)}</div>
                           </a>
-                          <a href="{IAC_CONSOLE_URL}" target="_blank" class="stat-card">
+                          <a href="{IAC_RULES_URL}" target="_blank" class="stat-card">
                               <div class="stat-label">Rules Violated</div>
                               <div class="stat-value">{len(by_rule)}</div>
                           </a>
