@@ -166,9 +166,9 @@ stages:
           from datetime import datetime
           from collections import Counter, defaultdict
 
-          FALCON_CLIENT_ID = os.environ.get('FALCON_CLIENT_ID')
-          FALCON_CLIENT_SECRET = os.environ.get('FALCON_CLIENT_SECRET')
-          FALCON_REGION = os.environ.get('FALCON_REGION', 'us-1')
+          FALCON_CLIENT_ID = "$(FALCON_CLIENT_ID)"
+          FALCON_CLIENT_SECRET = "$(FALCON_CLIENT_SECRET)"
+          FALCON_REGION = 'us-1'
 
           if FALCON_REGION == 'us-2':
               FALCON_BASE_URL = "https://api.us-2.crowdstrike.com"
