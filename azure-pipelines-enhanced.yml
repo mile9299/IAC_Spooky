@@ -672,6 +672,91 @@ stages:
                       .severity-section {{ grid-template-columns: 1fr; }}
                       .summary-grid {{ grid-template-columns: 1fr; }}
                   }}
+
+        /* Top Services Widget */
+        .services-widget {
+            background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #E01F27;
+        }
+
+        .services-widget h2 {
+            color: #E01F27;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .service-bar-container {
+            margin-bottom: 20px;
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .service-name {
+            color: #C9D1D9;
+            font-weight: 600;
+        }
+
+        .service-count {
+            color: #8B949E;
+        }
+
+        .service-bar-track {
+            background: #0D1117;
+            height: 28px;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .service-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
+            border-radius: 14px;
+            transition: width 1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 12px;
+            box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .service-percentage {
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 1;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
               </style>
           </head>
           <body>
@@ -996,6 +1081,91 @@ stages:
             text-align: center;
             color: #8B949E;
             font-size: 13px;
+        }
+
+        /* Top Services Widget */
+        .services-widget {
+            background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #E01F27;
+        }
+
+        .services-widget h2 {
+            color: #E01F27;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .service-bar-container {
+            margin-bottom: 20px;
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .service-name {
+            color: #C9D1D9;
+            font-weight: 600;
+        }
+
+        .service-count {
+            color: #8B949E;
+        }
+
+        .service-bar-track {
+            background: #0D1117;
+            height: 28px;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .service-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
+            border-radius: 14px;
+            transition: width 1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 12px;
+            box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .service-percentage {
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 1;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }
     </style>
 </head>
