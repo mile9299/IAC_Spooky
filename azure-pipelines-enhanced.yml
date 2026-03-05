@@ -264,19 +264,9 @@ stages:
               pipeline_name = os.environ.get('BUILD_DEFINITIONNAME', 'N/A')
               repo_name = os.environ.get('BUILD_REPOSITORY_NAME', 'N/A')
 
-              # Calculate pass/fail status
-              if severity_counts.get('Critical', 0) > 0 or severity_counts.get('High', 0) > 0:
-                  scan_status = "FAILED"
-                  status_color = "#E01F27"
-                  status_icon = "❌"
-              elif severity_counts.get('Medium', 0) > 0:
-                  scan_status = "WARNING"
-                  status_color = "#FF6B00"
-                  status_icon = "⚠️"
-              else:
-                  scan_status = "PASSED"
-                  status_color = "#28a745"
-                  status_icon = "✅"
+              # Get top services for widget
+              top_services = service_counts.most_common(10)
+              max_service_count = top_services[0][1] if top_services else 1
 
               html = f"""<!DOCTYPE html>
           <html lang="en">
@@ -359,6 +349,97 @@ stages:
                   }}
 
                   .pipeline-badge strong {{ margin-left: 5px; }}
+                  /* Top Services Widget */
+                  .services-widget {{
+                      background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+                      padding: 30px;
+                      border-radius: 12px;
+                      margin-bottom: 30px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                      border-left: 5px solid #E01F27;
+                  }}
+
+                  .services-widget h2 {{
+                      color: #E01F27;
+                      font-size: 24px;
+                      margin-bottom: 25px;
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                  }}
+
+                  .service-bar-container {{
+                      margin-bottom: 20px;
+                  }}
+
+                  .service-header {{
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 8px;
+                  }}
+
+                  .service-name {{
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: #C9D1D9;
+                  }}
+
+                  .service-count {{
+                      font-size: 14px;
+                      font-weight: 700;
+                      color: #E01F27;
+                      background: rgba(224, 31, 39, 0.1);
+                      padding: 4px 12px;
+                      border-radius: 12px;
+                  }}
+
+                  .service-bar-track {{
+                      width: 100%;
+                      height: 28px;
+                      background: #0D1117;
+                      border-radius: 14px;
+                      overflow: hidden;
+                      position: relative;
+                      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+                  }}
+
+                  .service-bar-fill {{
+                      height: 100%;
+                      background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
+                      border-radius: 14px;
+                      transition: width 1s ease-out;
+                      display: flex;
+                      align-items: center;
+                      justify-content: flex-end;
+                      padding-right: 12px;
+                      box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
+                  }}
+
+                  .service-bar-fill::after {{
+                      content: '';
+                      position: absolute;
+                      top: 0;
+                      left: 0;
+                      right: 0;
+                      bottom: 0;
+                      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+                      animation: shimmer 2s infinite;
+                  }}
+
+                  @keyframes shimmer {{
+                      0% {{ transform: translateX(-100%); }}
+                      100% {{ transform: translateX(100%); }}
+                  }}
+
+                  .service-percentage {{
+                      font-size: 11px;
+                      font-weight: 700;
+                      color: white;
+                      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                      z-index: 1;
+                  }}
+
 
                   /* Status Banner */
                   .status-banner {{
@@ -610,16 +691,29 @@ stages:
                           </div>
                       </div>
                   </div>
+                  <!-- Top Detections by Service Widget -->
+                  <div class="services-widget">
+                      <h2>📊 Top Detections by Service</h2>
+          """
 
-                  <!-- Status Banner -->
-                  <div class="status-banner">
-                      <div class="status-content">
-                          <div class="status-icon">{status_icon}</div>
-                          <div class="status-text">
-                              <h2>Scan Status: {scan_status}</h2>
-                              <p>Scan Period: {date_range} | Report Generated: {report_time}</p>
+              # Generate service bars
+              for i, (service, count) in enumerate(top_services, 1):
+                  percentage = (count / max_service_count) * 100
+                  html += f"""
+                      <div class="service-bar-container">
+                          <div class="service-header">
+                              <span class="service-name">#{i} {service}</span>
+                              <span class="service-count">{count} violations</span>
+                          </div>
+                          <div class="service-bar-track">
+                              <div class="service-bar-fill" style="width: {percentage}%">
+                                  <span class="service-percentage">{percentage:.0f}%</span>
+                              </div>
                           </div>
                       </div>
+                  """
+
+              html += """
                   </div>
 
                   <!-- Executive Summary -->
