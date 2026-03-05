@@ -21,7 +21,7 @@ variables:
   - name: FALCON_REGION
     value: 'us-1'
   - name: PROJECT_PATH
-    value: 'git::https://github.com/Blackweather/iac-sample-aws.git'
+    value: 'git::https://github.com/JFolberth/Azure_IaC_Flavors.git'
 
 stages:
 - stage: Build
