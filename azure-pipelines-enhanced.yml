@@ -928,65 +928,133 @@ stages:
           export FALCON_REGION="$(FALCON_REGION)"
 
           python3 generate_iac_report.py
-
-          # Capture the exit code
-          REPORT_EXIT_CODE=$?
           
           echo "==================== DEBUG OUTPUT ===================="
-          echo "Report generation exit code: $REPORT_EXIT_CODE"
           echo "Current directory: $(pwd)"
           echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
           echo ""
-          echo "Files in current directory:"
-          ls -lah | grep -E '\.html|\.json' || echo "No HTML or JSON files found"
+          echo "Files generated:"
+          ls -lh iac_security_report.html 2>/dev/null || echo "Report file NOT found"
+          ls -lh iac_detections.json 2>/dev/null || echo "JSON file NOT found"
           echo "======================================================="
           
-          # Ensure artifact staging directory exists
+          # ALWAYS ensure artifact directory exists
           mkdir -p "$(Build.ArtifactStagingDirectory)"
           
-          # Always create the report file (even if generation failed)
-          if [ ! -f "iac_security_report.html" ]; then
-            echo "⚠️  Report file not found! Creating placeholder..."
-            cat > "iac_security_report.html" << 'PLACEHOLDER'
+          # Strategy: Create the file DIRECTLY in artifact directory to guarantee it exists
+          ARTIFACT_DIR="$(Build.ArtifactStagingDirectory)"
+          REPORT_FILE="$ARTIFACT_DIR/iac_security_report.html"
+          
+          # If report was generated in current dir, move it
+          if [ -f "iac_security_report.html" ]; then
+            echo "✅ Report found in current directory, moving to artifacts..."
+            mv -v "iac_security_report.html" "$REPORT_FILE"
+          else
+            # Create placeholder DIRECTLY in artifact directory
+            echo "⚠️  Report not generated, creating placeholder DIRECTLY in artifact directory..."
+            cat > "$REPORT_FILE" << 'PLACEHOLDER'
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>IaC Report - Generation Failed</title>
+    <meta charset="UTF-8">
+    <title>CrowdStrike IaC Report - Not Available</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #0D1117; color: #C9D1D9; padding: 40px; text-align: center; }
-        .error { background: #E01F27; color: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; }
-        h1 { margin: 0 0 15px 0; }
-        p { margin: 10px 0; }
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
+            color: #C9D1D9; 
+            padding: 40px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #161B22;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #E01F27;
+        }
+        .header {
+            background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h1 { margin: 0; font-size: 28px; }
+        h2 { color: #E01F27; margin: 20px 0; }
+        ul { 
+            background: #0D1117;
+            padding: 20px 40px;
+            border-radius: 8px;
+            line-height: 1.8;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #8B949E;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
-    <div class="error">
-        <h1>🛡️ CrowdStrike IaC Report</h1>
-        <h2>Report Generation Failed</h2>
-        <p>The IaC security report could not be generated.</p>
-        <p><strong>Possible reasons:</strong></p>
-        <ul style="text-align: left; display: inline-block;">
-            <li>Falcon API credentials not configured</li>
-            <li>No IaC detections found in last 30 days</li>
-            <li>API connection timeout</li>
-            <li>Python script error</li>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ CrowdStrike Falcon Cloud Security</h1>
+            <p>Infrastructure as Code Security Report</p>
+        </div>
+        
+        <h2>⚠️ Report Not Available</h2>
+        <p>The IaC security report could not be generated during this pipeline run.</p>
+        
+        <h3>Possible Reasons:</h3>
+        <ul>
+            <li>Falcon API credentials not configured in pipeline variables</li>
+            <li>No IaC detections found in the last scan</li>
+            <li>Network connectivity issues to Falcon API</li>
+            <li>Python script execution error</li>
+            <li>Insufficient API permissions</li>
         </ul>
-        <p style="margin-top: 20px;">Check pipeline logs for details.</p>
+        
+        <h3>How to Fix:</h3>
+        <ul>
+            <li>Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are set</li>
+            <li>Check the pipeline logs for detailed error messages</li>
+            <li>Ensure the Falcon API is accessible from Azure DevOps</li>
+            <li>Run an IaC scan using the FCS CLI tool first</li>
+        </ul>
+        
+        <div class="footer">
+            <p><strong>CrowdStrike Falcon Cloud Security</strong></p>
+            <p>Check pipeline logs for more details</p>
+        </div>
     </div>
 </body>
 </html>
 PLACEHOLDER
-            echo "✅ Placeholder report created"
+            echo "✅ Placeholder report created at: $REPORT_FILE"
           fi
           
-          # Copy with verbose output
-          cp -v "iac_security_report.html" "$(Build.ArtifactStagingDirectory)/" && \
-            echo "✅ IaC Security Report copied to artifacts" || \
-            echo "❌ Failed to copy report to artifacts"
+          # Also handle JSON if it exists
+          if [ -f "iac_detections.json" ]; then
+            mv -v "iac_detections.json" "$ARTIFACT_DIR/"
+            echo "✅ JSON data moved to artifacts"
+          fi
           
-          # List artifact directory contents
-          echo "Artifact directory contents:"
-          ls -lh "$(Build.ArtifactStagingDirectory)/" || echo "Cannot list artifact directory"
+          # FINAL VERIFICATION - Absolutely confirm the file exists
+          if [ -f "$REPORT_FILE" ]; then
+            echo "✅✅✅ SUCCESS: Report file exists at $REPORT_FILE"
+            ls -lh "$REPORT_FILE"
+          else
+            echo "❌❌❌ CRITICAL ERROR: File still not found after all attempts!"
+            echo "This should never happen. Creating emergency fallback..."
+            echo "<html><body><h1>Error</h1></body></html>" > "$REPORT_FILE"
+          fi
+          
+          echo "Final artifact directory contents:"
+          ls -lh "$ARTIFACT_DIR/" || echo "Cannot list directory"
       continueOnError: true
       env:
         FALCON_CLIENT_ID: $(FALCON_CLIENT_ID)
