@@ -21,7 +21,7 @@ variables:
   - name: FALCON_REGION
     value: 'us-1'
   - name: PROJECT_PATH
-    value: 'git::https://github.com/mile9299/IAC_Examples.git'
+    value: 'git::https://github.com/bridgecrewio/terragoat.git'
 
 stages:
 - stage: Build
