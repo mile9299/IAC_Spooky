@@ -264,15 +264,19 @@ stages:
               pipeline_name = os.environ.get('BUILD_DEFINITIONNAME', 'N/A')
               repo_name = os.environ.get('BUILD_REPOSITORY_NAME', 'N/A')
 
-              # Get top services by rule violation count for chart
-              service_violation_counts = {}
-              for det in detections:
-                  service = det.get("rule", {}).get("service", "Unknown")
-                  service_violation_counts[service] = service_violation_counts.get(service, 0) + 1
-
-              # Sort and get top 10 services
-              top_services = sorted(service_violation_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-              max_violations = top_services[0][1] if top_services else 1
+              # Calculate pass/fail status
+              if severity_counts.get('Critical', 0) > 0 or severity_counts.get('High', 0) > 0:
+                  scan_status = "FAILED"
+                  status_color = "#E01F27"
+                  status_icon = "❌"
+              elif severity_counts.get('Medium', 0) > 0:
+                  scan_status = "WARNING"
+                  status_color = "#FF6B00"
+                  status_icon = "⚠️"
+              else:
+                  scan_status = "PASSED"
+                  status_color = "#28a745"
+                  status_icon = "✅"
 
               html = f"""<!DOCTYPE html>
           <html lang="en">
@@ -586,105 +590,6 @@ stages:
                       .header h1 {{ font-size: 28px; }}
                       .severity-section {{ grid-template-columns: 1fr; }}
                       .summary-grid {{ grid-template-columns: 1fr; }}
-                  }}
-
-                  /* Service Column Chart Styles */
-                  .chart-widget {
-                      background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
-                      padding: 30px;
-                      border-radius: 12px;
-                      margin-bottom: 30px;
-                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                      border-left: 5px solid #E01F27;
-                  }
-
-                  .chart-widget h2 {
-                      color: #E01F27;
-                      margin-top: 0;
-                      margin-bottom: 25px;
-                      font-size: 24px;
-                      font-weight: 600;
-                      text-align: center;
-                  }
-
-                  .chart-container {
-                      display: flex;
-                      align-items: flex-end;
-                      justify-content: space-around;
-                      height: 300px;
-                      padding: 20px 0;
-                      border-bottom: 2px solid #30363D;
-                      gap: 10px;
-                  }
-
-                  .chart-column {
-                      flex: 1;
-                      display: flex;
-                      flex-direction: column;
-                      align-items: center;
-                      gap: 8px;
-                  }
-
-                  .column-bar {
-                      width: 100%;
-                      max-width: 60px;
-                      background: linear-gradient(180deg, #FF3D3D 0%, #E01F27 100%);
-                      border-radius: 8px 8px 0 0;
-                      transition: all 0.8s ease-out;
-                      box-shadow: 0 -4px 12px rgba(224, 31, 39, 0.4);
-                      position: relative;
-                      animation: growUp 1.2s ease-out;
-                  }
-
-                  @keyframes growUp {{
-                      from {{ transform: scaleY(0); transform-origin: bottom; }}
-                      to {{ transform: scaleY(1); transform-origin: bottom; }}
-                  }}
-
-                  .column-bar::before {
-                      content: '';
-                      position: absolute;
-                      top: 0;
-                      left: 0;
-                      right: 0;
-                      height: 40%;
-                      background: linear-gradient(180deg, rgba(255,255,255,0.3), transparent);
-                      border-radius: 8px 8px 0 0;
-                  }
-
-                  .column-value {
-                      position: absolute;
-                      top: -25px;
-                      width: 100%;
-                      text-align: center;
-                      color: #C9D1D9;
-                      font-weight: 700;
-                      font-size: 14px;
-                      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                  }
-
-                  .column-label {
-                      color: #8B949E;
-                      font-size: 12px;
-                      text-align: center;
-                      word-wrap: break-word;
-                      max-width: 80px;
-                      font-weight: 500;
-                  }
-
-                  /* Responsive chart */
-                  @media (max-width: 768px) {{
-                      .chart-container {{
-                          height: 250px;
-                          gap: 5px;
-                      }}
-                      .column-bar {{
-                          max-width: 40px;
-                      }}
-                      .column-label {{
-                          font-size: 10px;
-                          max-width: 60px;
-                      }}
                   }}
               </style>
           </head>
