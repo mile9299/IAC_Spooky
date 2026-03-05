@@ -21,7 +21,7 @@ variables:
   - name: FALCON_REGION
     value: 'us-1'
   - name: PROJECT_PATH
-    value: 'git::https://github.com/mile9299/harnesscd-example-apps.git'
+    value: 'git::https://github.com/Blackweather/iac-sample-aws.git'
 
 stages:
 - stage: Build
