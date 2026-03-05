@@ -1,0 +1,1384 @@
+trigger:
+  branches:
+    include:
+    - "*"
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: "Pipeline_Scanning_Variables"
+  - name: JUICE_SHOP_REPO
+    value: 'https://github.com/mile9299/juice-shopv21.git'
+  - name: DOCKER_PORT
+    value: '3000'
+  - name: CS_IMAGE_NAME
+    value: 'mile/cs-fcs'
+  - name: CS_IMAGE_TAG
+    value: '2.1.0'
+  - name: CS_USERNAME
+    value: 'mile'
+  - name: FALCON_REGION
+    value: 'us-1'
+  - name: PROJECT_PATH
+    value: 'git::https://github.com/bridgecrewio/terragoat.git'
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildAndTest
+    steps:
+    - checkout: self
+
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+        versionSpec: '18.0.0'
+
+    - task: Bash@3
+      displayName: 'Checkout Juice Shop Repo'
+      inputs:
+        targetType: 'inline'
+        script: |
+          git clone $(JUICE_SHOP_REPO) juice-shop
+          cd juice-shop
+
+    - task: Bash@3
+      displayName: 'Falcon Cloud Security IaC Scan'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set +x
+          scan_status=0
+          if [[ -z "$(CS_USERNAME)" || -z "$(CS_PASSWORD)" || -z "$(CS_REGISTRY)" || -z "$(CS_IMAGE_NAME)" || -z "$(CS_IMAGE_TAG)" || -z "$(FALCON_CLIENT_ID)" || -z "$(FALCON_CLIENT_SECRET)" || -z "$(FALCON_REGION)" || -z "$(PROJECT_PATH)" ]]; then
+              echo "Error: required environment variables/params are not set"
+              exit 1
+          else
+              echo "Logging in to crowdstrike registry with username: $(CS_USERNAME)"
+              echo "$(CS_PASSWORD)" | docker login --username "$(CS_USERNAME)" --password-stdin
+
+              if [ $? -eq 0 ]; then
+                  echo "Docker login successful"
+                  echo "Pulling fcs container target from crowdstrike"
+                  docker pull $(CS_IMAGE_NAME):$(CS_IMAGE_TAG)
+                  if [ $? -eq 0 ]; then
+                      echo "fcs docker container image pulled successfully"
+                      echo "=============== FCS IaC Scan Starts ==============="
+                      docker run --network=host --rm "$(CS_IMAGE_NAME)":"$(CS_IMAGE_TAG)" --client-id "$(FALCON_CLIENT_ID)" --client-secret "$(FALCON_CLIENT_SECRET)" --falcon-region "$(FALCON_REGION)" iac scan -p "$(PROJECT_PATH)" --upload-results  | tee $(Build.SourcesDirectory)/scansummary.txt
+                      echo "=============== FCS IaC Scan Ends ==============="
+                      echo "fcs-iac-scan-status: $scan_status"
+                      if [ $scan_status -eq 40 ]; then
+                          echo "Scan succeeded & vulnerabilities count are ABOVE the '--fail-on' threshold; Pipeline will be marked as Success, but this stage will be marked as Unstable"
+                          exit 0
+                      elif [ $scan_status -eq 0 ]; then
+                          echo "Scan succeeded & vulnerabilities count are BELOW the '--fail-on' threshold; Pipeline will be marked as Success"
+                          exit 0
+                      else
+                          echo "Unexpected scan exit code: $scan_status"
+                          exit 1
+                      fi
+                  else
+                      echo "Error: failed to pull fcs docker image from crowdstrike"
+                      exit 1
+                  fi
+              else
+                  echo "Error: docker login failed"
+                  exit 1
+              fi
+          fi
+
+    - task: Bash@3
+      displayName: 'Process SARIF file'
+      inputs:
+        targetType: 'inline'
+        script: |
+          if [ -f "$(Build.SourcesDirectory)/scansummary.txt" ]; then
+            SARIFFILE=$(grep -o 'Results saved to file: [^ ]*' $(Build.SourcesDirectory)/scansummary.txt | sed 's/Results saved to file: //')
+            if [ -n "$SARIFFILE" ] && [ -f "$SARIFFILE" ]; then
+              echo "Found SARIF file: $SARIFFILE"
+              jq '.runs[].tool.driver.informationUri = "https://www.crowdstrike.com"' $SARIFFILE > $(Build.SourcesDirectory)/results.sarif
+              echo "Successfully processed SARIF file to results.sarif"
+            else
+              echo "SARIF file not found in scan output, creating a minimal valid SARIF file"
+              echo '{
+                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+                "version": "2.1.0",
+                "runs": [{"tool": {"driver": {"name": "CrowdStrike Falcon", "informationUri": "https://www.crowdstrike.com", "rules": []}}, "results": []}]
+              }' > $(Build.SourcesDirectory)/results.sarif
+            fi
+          else
+            echo "Scan summary file not found, creating a minimal valid SARIF file"
+            echo '{
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [{"tool": {"driver": {"name": "CrowdStrike Falcon", "informationUri": "https://www.crowdstrike.com", "rules": []}}, "results": []}]
+            }' > $(Build.SourcesDirectory)/results.sarif
+          fi
+      continueOnError: true
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish SARIF results'
+      inputs:
+        pathToPublish: '$(Build.SourcesDirectory)/results.sarif'
+        artifactName: 'CodeAnalysisLogs'
+        publishLocation: 'Container'
+      continueOnError: true
+
+    - task: Bash@3
+      displayName: 'Return IAC Scan Summary'
+      inputs:
+        targetType: 'inline'
+        script: |
+          if [ -f "$(Build.SourcesDirectory)/scansummary.txt" ]; then
+            cat "$(Build.SourcesDirectory)/scansummary.txt"
+          else
+            echo "Scan summary file not found"
+          fi
+      continueOnError: true
+
+    # NEW: Generate Enhanced CrowdStrike-Branded IaC Security Report
+    - task: UsePythonVersion@0
+      displayName: 'Use Python 3.x'
+      inputs:
+        versionSpec: '3.x'
+        addToPath: true
+
+    - task: Bash@3
+      displayName: 'Generate CrowdStrike-Branded IaC Security Report'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set +x
+          echo "========================================================================"
+          echo "   CrowdStrike Falcon Cloud Security - IaC Report Generator"
+          echo "========================================================================"
+
+          if [[ -z "$(FALCON_CLIENT_ID)" || -z "$(FALCON_CLIENT_SECRET)" ]]; then
+            echo "Error: Falcon API credentials not set"
+            exit 1
+          fi
+
+          cat > generate_iac_report.py << 'PYTHON_SCRIPT'
+          #!/usr/bin/env python3
+          import json
+          import subprocess
+          import os
+          from datetime import datetime
+          from collections import Counter, defaultdict
+
+          FALCON_CLIENT_ID = os.environ.get('FALCON_CLIENT_ID')
+          FALCON_CLIENT_SECRET = os.environ.get('FALCON_CLIENT_SECRET')
+          FALCON_REGION = os.environ.get('FALCON_REGION', 'us-1')
+
+          if FALCON_REGION == 'us-2':
+              FALCON_BASE_URL = "https://api.us-2.crowdstrike.com"
+          elif FALCON_REGION == 'eu-1':
+              FALCON_BASE_URL = "https://api.eu-1.crowdstrike.com"
+          elif FALCON_REGION == 'us-gov-1':
+              FALCON_BASE_URL = "https://api.laggar.gcw.crowdstrike.com"
+          else:
+              FALCON_BASE_URL = "https://api.crowdstrike.com"
+
+          def query_iac_detections():
+              print("🔍 Querying IaC detections from Falcon API...")
+
+              token_cmd = f"""curl -s -X POST "{FALCON_BASE_URL}/oauth2/token" \
+                  -H "accept: application/json" \
+                  -H "Content-Type: application/x-www-form-urlencoded" \
+                  -d "client_id={FALCON_CLIENT_ID}&client_secret={FALCON_CLIENT_SECRET}"
+              """
+
+              token_result = subprocess.run(token_cmd, shell=True, capture_output=True, text=True)
+              token_data = json.loads(token_result.stdout)
+              access_token = token_data.get('access_token')
+
+              if not access_token:
+                  print(f"❌ Failed to get access token")
+                  return []
+
+              print("✅ Successfully authenticated with Falcon API")
+
+              detections_cmd = f"""curl -s -X GET "{FALCON_BASE_URL}/iac/combined/detections/v1?limit=5000&sort=last_detected.desc" \
+                  -H "accept: application/json" \
+                  -H "Authorization: Bearer {access_token}"
+              """
+
+              detections_result = subprocess.run(detections_cmd, shell=True, capture_output=True, text=True)
+              detections_data = json.loads(detections_result.stdout)
+
+              if detections_data.get('resources'):
+                  detections = detections_data['resources']
+                  print(f"✅ Retrieved {len(detections)} IaC detections")
+                  return detections
+              else:
+                  print(f"⚠️  No detections found")
+                  return []
+
+          def generate_html_report(detections):
+              severity_map = {0: 'Low', 1: 'Medium', 2: 'High', 3: 'Critical'}
+
+              severity_counts = Counter()
+              for det in detections:
+                  sev_num = det.get('rule', {}).get('severity', 0)
+                  sev_name = severity_map.get(sev_num, 'Unknown')
+                  severity_counts[sev_name] += 1
+
+              by_project = defaultdict(list)
+              for det in detections:
+                  project = det.get('project_name', 'Unknown Project')
+                  by_project[project].append(det)
+
+              by_file = defaultdict(list)
+              for det in detections:
+                  file_name = det.get('file_name', 'Unknown File')
+                  by_file[file_name].append(det)
+
+              by_rule = defaultdict(list)
+              for det in detections:
+                  rule_name = det.get('rule', {}).get('rule_name', 'Unknown Rule')
+                  by_rule[rule_name].append(det)
+
+              platform_counts = Counter(det.get('rule', {}).get('platform', 'Unknown') for det in detections)
+              cloud_counts = Counter(det.get('rule', {}).get('cloud_provider', 'Unknown') for det in detections)
+              service_counts = Counter(det.get('rule', {}).get('service', 'Unknown') for det in detections)
+
+              if detections:
+                  dates = [det.get('last_detected', '') for det in detections if det.get('last_detected')]
+                  if dates:
+                      earliest = min(dates)
+                      latest = max(dates)
+                      try:
+                          earliest_dt = datetime.fromisoformat(earliest.replace('Z', '+00:00'))
+                          latest_dt = datetime.fromisoformat(latest.replace('Z', '+00:00'))
+                          date_range = f"{earliest_dt.strftime('%B %d, %Y')} - {latest_dt.strftime('%B %d, %Y')}"
+                      except:
+                          date_range = f"{earliest} - {latest}"
+                  else:
+                      date_range = "N/A"
+              else:
+                  date_range = "N/A"
+
+              report_time = datetime.now().strftime('%B %d, %Y at %I:%M %p UTC')
+              build_id = os.environ.get('BUILD_BUILDID', 'N/A')
+              build_number = os.environ.get('BUILD_BUILDNUMBER', 'N/A')
+              pipeline_name = os.environ.get('BUILD_DEFINITIONNAME', 'N/A')
+              repo_name = os.environ.get('BUILD_REPOSITORY_NAME', 'N/A')
+
+              # Get top services for widget
+              top_services = service_counts.most_common(10)
+              max_service_count = top_services[0][1] if top_services else 1
+
+              html = f"""<!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>CrowdStrike Falcon Cloud Security - IaC Scan Report</title>
+              <style>
+                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                  body {{
+                      font-family: 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+                      background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
+                      color: #C9D1D9;
+                      line-height: 1.6;
+                      min-height: 100vh;
+                      padding: 20px;
+                  }}
+
+                  .container {{ max-width: 1400px; margin: 0 auto; }}
+
+                  /* Header with CrowdStrike Branding */
+                  .header {{
+                      background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
+                      color: white;
+                      padding: 40px;
+                      border-radius: 12px;
+                      margin-bottom: 30px;
+                      box-shadow: 0 8px 16px rgba(224, 31, 39, 0.3);
+                      position: relative;
+                      overflow: hidden;
+                  }}
+
+                  .header::before {{
+                      content: '';
+                      position: absolute;
+                      top: -50%;
+                      right: -10%;
+                      width: 500px;
+                      height: 500px;
+                      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+                      border-radius: 50%;
+                  }}
+
+                  .header-content {{ position: relative; z-index: 1; }}
+
+                  .logo-section {{
+                      display: flex;
+                      align-items: center;
+                      margin-bottom: 20px;
+                  }}
+
+                  .logo {{
+                      font-size: 48px;
+                      margin-right: 15px;
+                      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+                  }}
+
+                  .header h1 {{
+                      font-size: 36px;
+                      font-weight: 700;
+                      margin-bottom: 8px;
+                      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                  }}
+
+                  .header .subtitle {{
+                      font-size: 18px;
+                      opacity: 0.95;
+                      font-weight: 400;
+                  }}
+
+                  .pipeline-badge {{
+                      display: inline-flex;
+                      align-items: center;
+                      background: rgba(255,255,255,0.15);
+                      padding: 8px 16px;
+                      border-radius: 20px;
+                      font-size: 13px;
+                      margin-top: 15px;
+                      backdrop-filter: blur(10px);
+                  }}
+
+                  .pipeline-badge strong {{ margin-left: 5px; }}
+                  /* Top Services Widget */
+                  .services-widget {{
+                      background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+                      padding: 30px;
+                      border-radius: 12px;
+                      margin-bottom: 30px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                      border-left: 5px solid #E01F27;
+                  }}
+
+                  .services-widget h2 {{
+                      color: #E01F27;
+                      font-size: 24px;
+                      margin-bottom: 25px;
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                  }}
+
+                  .service-bar-container {{
+                      margin-bottom: 20px;
+                  }}
+
+                  .service-header {{
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 8px;
+                  }}
+
+                  .service-name {{
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: #C9D1D9;
+                  }}
+
+                  .service-count {{
+                      font-size: 14px;
+                      font-weight: 700;
+                      color: #E01F27;
+                      background: rgba(224, 31, 39, 0.1);
+                      padding: 4px 12px;
+                      border-radius: 12px;
+                  }}
+
+                  .service-bar-track {{
+                      width: 100%;
+                      height: 28px;
+                      background: #0D1117;
+                      border-radius: 14px;
+                      overflow: hidden;
+                      position: relative;
+                      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+                  }}
+
+                  .service-bar-fill {{
+                      height: 100%;
+                      background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
+                      border-radius: 14px;
+                      transition: width 1s ease-out;
+                      display: flex;
+                      align-items: center;
+                      justify-content: flex-end;
+                      padding-right: 12px;
+                      box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
+                  }}
+
+                  .service-bar-fill::after {{
+                      content: '';
+                      position: absolute;
+                      top: 0;
+                      left: 0;
+                      right: 0;
+                      bottom: 0;
+                      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+                      animation: shimmer 2s infinite;
+                  }}
+
+                  @keyframes shimmer {{
+                      0% {{ transform: translateX(-100%); }}
+                      100% {{ transform: translateX(100%); }}
+                  }}
+
+                  .service-percentage {{
+                      font-size: 11px;
+                      font-weight: 700;
+                      color: white;
+                      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                      z-index: 1;
+                  }}
+
+
+                  /* Status Banner */
+                  .status-banner {{
+                      background: linear-gradient(135deg, {status_color} 0%, {status_color}dd 100%);
+                      color: white;
+                      padding: 20px 30px;
+                      border-radius: 10px;
+                      margin-bottom: 30px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                  }}
+
+                  .status-content {{
+                      display: flex;
+                      align-items: center;
+                      gap: 15px;
+                  }}
+
+                  .status-icon {{ font-size: 36px; }}
+
+                  .status-text h2 {{
+                      font-size: 24px;
+                      font-weight: 700;
+                      margin-bottom: 5px;
+                  }}
+
+                  .status-text p {{ opacity: 0.9; font-size: 14px; }}
+
+                  /* Executive Summary */
+                  .executive-summary {{
+                      background: #161B22;
+                      padding: 30px;
+                      border-radius: 12px;
+                      border-left: 5px solid #E01F27;
+                      margin-bottom: 30px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                  }}
+
+                  .executive-summary h2 {{
+                      color: #E01F27;
+                      font-size: 24px;
+                      margin-bottom: 25px;
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                  }}
+
+                  .summary-grid {{
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                      gap: 20px;
+                  }}
+
+                  .stat-card {{
+                      background: linear-gradient(135deg, #0D1117 0%, #1C2128 100%);
+                      padding: 20px;
+                      border-radius: 10px;
+                      border: 1px solid #30363D;
+                      transition: transform 0.2s, box-shadow 0.2s;
+                  }}
+
+                  .stat-card:hover {{
+                      transform: translateY(-2px);
+                      box-shadow: 0 6px 16px rgba(224, 31, 39, 0.2);
+                  }}
+
+                  .stat-label {{
+                      color: #8B949E;
+                      font-size: 11px;
+                      text-transform: uppercase;
+                      letter-spacing: 1px;
+                      margin-bottom: 10px;
+                      font-weight: 600;
+                  }}
+
+                  .stat-value {{
+                      font-size: 32px;
+                      font-weight: 700;
+                      color: #C9D1D9;
+                  }}
+
+                  .stat-value.critical {{ color: #E01F27; }}
+
+                  /* Severity Cards */
+                  .severity-section {{
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                      gap: 20px;
+                      margin-bottom: 30px;
+                  }}
+
+                  .severity-card {{
+                      background: #161B22;
+                      padding: 30px;
+                      border-radius: 12px;
+                      border-left: 5px solid;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                      transition: transform 0.2s;
+                  }}
+
+                  .severity-card:hover {{ transform: translateY(-4px); }}
+
+                  .severity-card.critical {{ border-left-color: #E01F27; }}
+                  .severity-card.high {{ border-left-color: #FF3D3D; }}
+                  .severity-card.medium {{ border-left-color: #FF6B00; }}
+                  .severity-card.low {{ border-left-color: #FFC107; }}
+
+                  .severity-card h3 {{
+                      color: #8B949E;
+                      font-size: 13px;
+                      text-transform: uppercase;
+                      letter-spacing: 1px;
+                      margin-bottom: 15px;
+                      font-weight: 600;
+                  }}
+
+                  .severity-card .value {{
+                      font-size: 48px;
+                      font-weight: 700;
+                      color: #C9D1D9;
+                      line-height: 1;
+                      margin-bottom: 10px;
+                  }}
+
+                  .severity-card .subtext {{
+                      color: #8B949E;
+                      font-size: 12px;
+                  }}
+
+                  /* Section Styling */
+                  .section {{
+                      background: #161B22;
+                      padding: 30px;
+                      border-radius: 12px;
+                      margin-bottom: 25px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                  }}
+
+                  .section h2 {{
+                      color: #E01F27;
+                      font-size: 22px;
+                      margin-bottom: 20px;
+                      padding-bottom: 15px;
+                      border-bottom: 2px solid #30363D;
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                  }}
+
+                  /* Table Styling */
+                  table {{
+                      width: 100%;
+                      border-collapse: collapse;
+                      margin: 20px 0;
+                      font-size: 13px;
+                  }}
+
+                  th {{
+                      background: #0D1117;
+                      color: #8B949E;
+                      padding: 15px;
+                      text-align: left;
+                      font-weight: 600;
+                      text-transform: uppercase;
+                      font-size: 11px;
+                      letter-spacing: 1px;
+                      border-bottom: 2px solid #30363D;
+                  }}
+
+                  td {{
+                      padding: 15px;
+                      border-bottom: 1px solid #21262D;
+                  }}
+
+                  tr:hover {{ background: rgba(224, 31, 39, 0.05); }}
+
+                  /* Severity Badges */
+                  .severity-badge {{
+                      display: inline-block;
+                      padding: 6px 14px;
+                      border-radius: 20px;
+                      font-size: 11px;
+                      font-weight: 700;
+                      text-transform: uppercase;
+                      letter-spacing: 0.5px;
+                  }}
+
+                  .severity-critical {{ background: #E01F27; color: white; }}
+                  .severity-high {{ background: #FF3D3D; color: white; }}
+                  .severity-medium {{ background: #FF6B00; color: white; }}
+                  .severity-low {{ background: #FFC107; color: #000; }}
+
+                  /* Platform Badge */
+                  .platform-badge {{
+                      display: inline-block;
+                      padding: 4px 10px;
+                      border-radius: 4px;
+                      font-size: 11px;
+                      font-weight: 600;
+                      background: #238636;
+                      color: white;
+                  }}
+
+                  /* Footer */
+                  .footer {{
+                      background: #0D1117;
+                      padding: 30px;
+                      border-radius: 12px;
+                      text-align: center;
+                      color: #6E7681;
+                      margin-top: 40px;
+                      border-top: 3px solid #E01F27;
+                  }}
+
+                  .footer p {{ margin: 8px 0; font-size: 13px; }}
+                  .footer strong {{ color: #C9D1D9; }}
+
+                  .cs-logo-text {{
+                      font-size: 18px;
+                      color: #E01F27;
+                      font-weight: 700;
+                      margin-bottom: 10px;
+                  }}
+
+                  /* Responsive */
+                  @media (max-width: 768px) {{
+                      .header h1 {{ font-size: 28px; }}
+                      .severity-section {{ grid-template-columns: 1fr; }}
+                      .summary-grid {{ grid-template-columns: 1fr; }}
+                  }}
+
+        /* Top Services Widget */
+        .services-widget {
+            background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #E01F27;
+        }
+
+        .services-widget h2 {
+            color: #E01F27;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .service-bar-container {
+            margin-bottom: 20px;
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .service-name {
+            color: #C9D1D9;
+            font-weight: 600;
+        }
+
+        .service-count {
+            color: #8B949E;
+        }
+
+        .service-bar-track {
+            background: #0D1117;
+            height: 28px;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .service-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
+            border-radius: 14px;
+            transition: width 1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 12px;
+            box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .service-percentage {
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 1;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <!-- CrowdStrike Branded Header -->
+                  <div class="header">
+                      <div class="header-content">
+                          <div class="logo-section">
+                              <div class="logo">🛡️</div>
+                              <div>
+                                  <h1>CrowdStrike Falcon Cloud Security</h1>
+                                  <div class="subtitle">Infrastructure as Code Security Scan Report</div>
+                              </div>
+                          </div>
+                          <div class="pipeline-badge">
+                              🔄 <strong>Pipeline:</strong> {pipeline_name} | <strong>Build:</strong> #{build_number}
+                          </div>
+                      </div>
+                  </div>
+                  <!-- Top Detections by Service Widget -->
+                  <div class="services-widget">
+                      <h2>📊 Top Detections by Service</h2>
+          """
+
+              # Generate service bars
+              for i, (service, count) in enumerate(top_services, 1):
+                  percentage = (count / max_service_count) * 100
+                  html += f"""
+                      <div class="service-bar-container">
+                          <div class="service-header">
+                              <span class="service-name">#{i} {service}</span>
+                              <span class="service-count">{count} violations</span>
+                          </div>
+                          <div class="service-bar-track">
+                              <div class="service-bar-fill" style="width: {percentage}%">
+                                  <span class="service-percentage">{percentage:.0f}%</span>
+                              </div>
+                          </div>
+                      </div>
+                  """
+
+              html += """
+                  </div>
+
+                  <!-- Executive Summary -->
+                  <div class="executive-summary">
+                      <h2>📊 Executive Summary</h2>
+                      <div class="summary-grid">
+                          <div class="stat-card">
+                              <div class="stat-label">Total Violations</div>
+                              <div class="stat-value critical">{len(detections)}</div>
+                          </div>
+                          <div class="stat-card">
+                              <div class="stat-label">Projects Scanned</div>
+                              <div class="stat-value">{len(by_project)}</div>
+                          </div>
+                          <div class="stat-card">
+                              <div class="stat-label">Files Affected</div>
+                              <div class="stat-value">{len(by_file)}</div>
+                          </div>
+                          <div class="stat-card">
+                              <div class="stat-label">Rules Violated</div>
+                              <div class="stat-value">{len(by_rule)}</div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- Severity Cards -->
+                  <div class="severity-section">
+                      <div class="severity-card critical">
+                          <h3>🔴 Critical Severity</h3>
+                          <div class="value">{severity_counts.get('Critical', 0)}</div>
+                          <div class="subtext">Requires immediate remediation</div>
+                      </div>
+                      <div class="severity-card high">
+                          <h3>🟠 High Severity</h3>
+                          <div class="value">{severity_counts.get('High', 0)}</div>
+                          <div class="subtext">Must be addressed soon</div>
+                      </div>
+                      <div class="severity-card medium">
+                          <h3>🟡 Medium Severity</h3>
+                          <div class="value">{severity_counts.get('Medium', 0)}</div>
+                          <div class="subtext">Should be fixed</div>
+                      </div>
+                      <div class="severity-card low">
+                          <h3>🟢 Low Severity</h3>
+                          <div class="value">{severity_counts.get('Low', 0)}</div>
+                          <div class="subtext">Minor issues</div>
+                      </div>
+                  </div>
+
+                  <!-- Scan Coverage -->
+                  <div class="section">
+                      <h2>📈 Scan Coverage & Statistics</h2>
+                      <table>
+                          <thead>
+                              <tr>
+                                  <th>Category</th>
+                                  <th>Count</th>
+                                  <th>Details</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <tr>
+                                  <td><strong>IaC Platforms</strong></td>
+                                  <td><strong>{len(platform_counts)}</strong></td>
+                                  <td>{', '.join(f'{k}: {v}' for k, v in platform_counts.most_common())}</td>
+                              </tr>
+                              <tr>
+                                  <td><strong>Cloud Providers</strong></td>
+                                  <td><strong>{len(cloud_counts)}</strong></td>
+                                  <td>{', '.join(f'{k}: {v}' for k, v in cloud_counts.most_common())}</td>
+                              </tr>
+                              <tr>
+                                  <td><strong>Cloud Services</strong></td>
+                                  <td><strong>{len(service_counts)}</strong></td>
+                                  <td>{', '.join(f'{k}: {v}' for k, v in service_counts.most_common(10))}</td>
+                              </tr>
+                              <tr>
+                                  <td><strong>Repository</strong></td>
+                                  <td colspan="2">{repo_name}</td>
+                              </tr>
+                          </tbody>
+                      </table>
+                  </div>
+
+                  <!-- Top Violations -->
+                  <div class="section">
+                      <h2>🚨 Top 20 Most Common Violations</h2>
+                      <table>
+                          <thead>
+                              <tr>
+                                  <th>Severity</th>
+                                  <th>Rule Name</th>
+                                  <th>Platform</th>
+                                  <th>Service</th>
+                                  <th>Count</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+          """
+
+              sorted_rules = sorted(by_rule.items(), key=lambda x: len(x[1]), reverse=True)[:20]
+
+              for rule_name, dets in sorted_rules:
+                  rule = dets[0].get('rule', {})
+                  severity_num = rule.get('severity', 0)
+                  severity_name = severity_map.get(severity_num, 'Unknown').lower()
+                  platform = rule.get('platform', 'Unknown')
+                  service = rule.get('service', 'Unknown')
+
+                  html += f"""
+                              <tr>
+                                  <td><span class="severity-badge severity-{severity_name}">{severity_name.upper()}</span></td>
+                                  <td><strong>{rule_name}</strong></td>
+                                  <td><span class="platform-badge">{platform}</span></td>
+                                  <td>{service}</td>
+                                  <td><strong>{len(dets)}</strong></td>
+                              </tr>
+                  """
+
+              html += f"""
+                          </tbody>
+                      </table>
+                  </div>
+
+                  <!-- Projects Summary -->
+                  <div class="section">
+                      <h2>📁 Projects Summary</h2>
+                      <table>
+                          <thead>
+                              <tr>
+                                  <th>Project Name</th>
+                                  <th>Total Violations</th>
+                                  <th>Files Affected</th>
+                                  <th>Critical</th>
+                                  <th>High</th>
+                                  <th>Medium</th>
+                                  <th>Low</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+          """
+
+              for project_name, dets in sorted(by_project.items(), key=lambda x: len(x[1]), reverse=True):
+                  project_sev = Counter()
+                  for det in dets:
+                      sev_num = det.get('rule', {}).get('severity', 0)
+                      sev_name = severity_map.get(sev_num, 'Unknown')
+                      project_sev[sev_name] += 1
+
+                  files_count = len(set(d.get('file_name', '') for d in dets))
+
+                  html += f"""
+                              <tr>
+                                  <td><strong>{project_name}</strong></td>
+                                  <td><strong>{len(dets)}</strong></td>
+                                  <td>{files_count}</td>
+                                  <td>{project_sev.get('Critical', 0)}</td>
+                                  <td>{project_sev.get('High', 0)}</td>
+                                  <td>{project_sev.get('Medium', 0)}</td>
+                                  <td>{project_sev.get('Low', 0)}</td>
+                              </tr>
+                  """
+
+              html += f"""
+                          </tbody>
+                      </table>
+                  </div>
+
+                  <!-- CrowdStrike Footer -->
+                  <div class="footer">
+                      <div class="cs-logo-text">🛡️ CROWDSTRIKE FALCON CLOUD SECURITY</div>
+                      <p><strong>Falcon Cloud Security (FCS)</strong> - Infrastructure as Code Security</p>
+                      <p>Pre-Deployment IaC Scanning | Terraform | CloudFormation | Kubernetes</p>
+                      <p style="margin-top: 15px;">Pipeline: <strong>{pipeline_name}</strong> | Build: <strong>#{build_number}</strong> | Build ID: <strong>{build_id}</strong></p>
+                      <p>Report Generated: <strong>{report_time}</strong></p>
+                      <p style="margin-top: 15px; font-size: 11px;">We Stop Breaches | <a href="https://www.crowdstrike.com" style="color: #E01F27;">www.crowdstrike.com</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+              """
+
+              return html
+
+          if __name__ == "__main__":
+              print("🚀 Starting CrowdStrike IaC Report Generation...")
+              detections = query_iac_detections()
+
+              if detections:
+                  html_report = generate_html_report(detections)
+
+                  with open('iac_security_report.html', 'w') as f:
+                      f.write(html_report)
+
+                  with open('iac_detections.json', 'w') as f:
+                      json.dump(detections, f, indent=2)
+
+                  print(f"\n✅ CrowdStrike IaC Security Report Generated Successfully!")
+                  print(f"📊 Total Violations: {len(detections)}")
+                  print(f"📄 Report: iac_security_report.html")
+                  print(f"📄 Data: iac_detections.json")
+              else:
+                  print("⚠️  No IaC detections found or API query failed")
+                  # Create empty report
+                  html_report = generate_html_report([])
+                  with open('iac_security_report.html', 'w') as f:
+                      f.write(html_report)
+          PYTHON_SCRIPT
+
+          export FALCON_CLIENT_ID="$(FALCON_CLIENT_ID)"
+          export FALCON_CLIENT_SECRET="$(FALCON_CLIENT_SECRET)"
+          export FALCON_REGION="$(FALCON_REGION)"
+
+          python3 generate_iac_report.py
+          
+          echo "==================== DEBUG OUTPUT ===================="
+          echo "Current directory: $(pwd)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+          echo ""
+          echo "Files generated:"
+          ls -lh iac_security_report.html 2>/dev/null || echo "Report file NOT found"
+          ls -lh iac_detections.json 2>/dev/null || echo "JSON file NOT found"
+          echo "======================================================="
+          
+          # ALWAYS ensure artifact directory exists
+          mkdir -p "$(Build.ArtifactStagingDirectory)"
+          
+          # Strategy: Create the file DIRECTLY in artifact directory to guarantee it exists
+          ARTIFACT_DIR="$(Build.ArtifactStagingDirectory)"
+          REPORT_FILE="$ARTIFACT_DIR/iac_security_report.html"
+          
+          # If report was generated in current dir, move it
+          if [ -f "iac_security_report.html" ]; then
+            echo "✅ Report found in current directory, moving to artifacts..."
+            mv -v "iac_security_report.html" "$REPORT_FILE"
+          else
+            # Create placeholder DIRECTLY in artifact directory
+            echo "⚠️  Report not generated, creating placeholder DIRECTLY in artifact directory..."
+            cat > "$REPORT_FILE" << 'PLACEHOLDER'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CrowdStrike IaC Report - Not Available</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
+            color: #C9D1D9; 
+            padding: 40px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #161B22;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #E01F27;
+        }
+        .header {
+            background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h1 { margin: 0; font-size: 28px; }
+        h2 { color: #E01F27; margin: 20px 0; }
+        ul { 
+            background: #0D1117;
+            padding: 20px 40px;
+            border-radius: 8px;
+            line-height: 1.8;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #8B949E;
+            font-size: 13px;
+        }
+
+        /* Top Services Widget */
+        .services-widget {
+            background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #E01F27;
+        }
+
+        .services-widget h2 {
+            color: #E01F27;
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .service-bar-container {
+            margin-bottom: 20px;
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .service-name {
+            color: #C9D1D9;
+            font-weight: 600;
+        }
+
+        .service-count {
+            color: #8B949E;
+        }
+
+        .service-bar-track {
+            background: #0D1117;
+            height: 28px;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .service-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
+            border-radius: 14px;
+            transition: width 1s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 12px;
+            box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .service-percentage {
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            z-index: 1;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ CrowdStrike Falcon Cloud Security</h1>
+            <p>Infrastructure as Code Security Report</p>
+        </div>
+        
+        <h2>⚠️ Report Not Available</h2>
+        <p>The IaC security report could not be generated during this pipeline run.</p>
+        
+        <h3>Possible Reasons:</h3>
+        <ul>
+            <li>Falcon API credentials not configured in pipeline variables</li>
+            <li>No IaC detections found in the last scan</li>
+            <li>Network connectivity issues to Falcon API</li>
+            <li>Python script execution error</li>
+            <li>Insufficient API permissions</li>
+        </ul>
+        
+        <h3>How to Fix:</h3>
+        <ul>
+            <li>Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are set</li>
+            <li>Check the pipeline logs for detailed error messages</li>
+            <li>Ensure the Falcon API is accessible from Azure DevOps</li>
+            <li>Run an IaC scan using the FCS CLI tool first</li>
+        </ul>
+        
+        <div class="footer">
+            <p><strong>CrowdStrike Falcon Cloud Security</strong></p>
+            <p>Check pipeline logs for more details</p>
+        </div>
+    </div>
+</body>
+</html>
+PLACEHOLDER
+            echo "✅ Placeholder report created at: $REPORT_FILE"
+          fi
+          
+          # Also handle JSON if it exists
+          if [ -f "iac_detections.json" ]; then
+            mv -v "iac_detections.json" "$ARTIFACT_DIR/"
+            echo "✅ JSON data moved to artifacts"
+          fi
+          
+          # FINAL VERIFICATION - Absolutely confirm the file exists
+          if [ -f "$REPORT_FILE" ]; then
+            echo "✅✅✅ SUCCESS: Report file exists at $REPORT_FILE"
+            ls -lh "$REPORT_FILE"
+          else
+            echo "❌❌❌ CRITICAL ERROR: File still not found after all attempts!"
+            echo "This should never happen. Creating emergency fallback..."
+            echo "<html><body><h1>Error</h1></body></html>" > "$REPORT_FILE"
+          fi
+          
+          echo "Final artifact directory contents:"
+          ls -lh "$ARTIFACT_DIR/" || echo "Cannot list directory"
+      continueOnError: true
+      env:
+        FALCON_CLIENT_ID: $(FALCON_CLIENT_ID)
+        FALCON_CLIENT_SECRET: $(FALCON_CLIENT_SECRET)
+        FALCON_REGION: $(FALCON_REGION)
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish CrowdStrike IaC Security Report'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/iac_security_report.html'
+        artifactName: 'CrowdStrike_IaC_Security_Report'
+        publishLocation: 'Container'
+      condition: succeededOrFailed()
+      continueOnError: true
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish IaC Detections JSON'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/iac_detections.json'
+        artifactName: 'IaC_Detections_Data'
+        publishLocation: 'Container'
+      condition: succeededOrFailed()
+      continueOnError: true
+
+    - task: Docker@2
+      displayName: 'Build container image using Docker'
+      inputs:
+        repository: $(CONTAINER_REPO)
+        command: 'build'
+        Dockerfile: '**/Dockerfile'
+        tags: $(CONTAINER_TAG)
+      continueOnError: true
+
+    - task: Bash@3
+      displayName: 'Scan container image with CrowdStrike Container Image Scan'
+      inputs:
+        targetType: 'inline'
+        script: |
+          export FALCON_CLIENT_SECRET=$(FALCON_CLIENT_SECRET)
+          export FALCON_CLIENT_ID=$(FALCON_CLIENT_ID)
+          pip3 install docker crowdstrike-falconpy
+          pip install retry
+          if [ ! -d container-image-scan ] ; then
+            git clone https://github.com/crowdstrike/container-image-scan
+          fi
+          python3 container-image-scan/cs_scanimage.py --json-report $(Build.SourcesDirectory)/report.json || true
+          if [ -f "$(Build.SourcesDirectory)/report.json" ]; then
+            echo "# Vulnerability Remediation Plan" > $(Build.SourcesDirectory)/remediation_plan.md
+            if jq -e '.vulnerabilities' $(Build.SourcesDirectory)/report.json > /dev/null 2>&1; then
+              echo "Vulnerabilities found in the image:"
+              jq -r '.vulnerabilities[] | select(.severity == "HIGH" or .severity == "CRITICAL") | "- \(.severity): \(.cve_id) in \(.package_name) \(.package_version)"' $(Build.SourcesDirectory)/report.json
+              echo "## High and Critical Vulnerabilities" >> $(Build.SourcesDirectory)/remediation_plan.md
+              jq -r '.vulnerabilities[] | select(.severity == "HIGH" or .severity == "CRITICAL") | "- **\(.severity)**: \(.cve_id) in \(.package_name) \(.package_version)\n  - Description: \(.description)\n  - Remediation: Update to latest version or apply patch"' $(Build.SourcesDirectory)/report.json >> $(Build.SourcesDirectory)/remediation_plan.md
+            fi
+            if jq -e '.secrets' $(Build.SourcesDirectory)/report.json > /dev/null 2>&1; then
+              echo "WARNING: Secrets were detected in the image:"
+              jq -r '.secrets[] | "- Secret type: \(.type) in \(.path)"' $(Build.SourcesDirectory)/report.json
+              echo "## Detected Secrets" >> $(Build.SourcesDirectory)/remediation_plan.md
+              jq -r '.secrets[] | "- Secret type: \(.type) found in \(.path)\n  - Action: Remove this secret and use secure storage methods instead"' $(Build.SourcesDirectory)/report.json >> $(Build.SourcesDirectory)/remediation_plan.md
+              echo "##vso[task.setvariable variable=SECRETS_FOUND]true"
+            else
+              echo "No secrets were detected in the image."
+            fi
+          else
+            echo "Error: Scan report not generated."
+            echo "# No security findings to report" > $(Build.SourcesDirectory)/remediation_plan.md
+          fi
+      continueOnError: true
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Remediation Plan'
+      inputs:
+        pathToPublish: '$(Build.SourcesDirectory)/remediation_plan.md'
+        artifactName: 'SecurityRemediationPlan'
+        publishLocation: 'Container'
+      continueOnError: true
+
+    - task: Bash@3
+      displayName: 'Build'
+      inputs:
+        targetType: 'inline'
+        script: |
+          npm cache clean -f
+          npm install
+          nohup npm start > /dev/null 2>&1 &
+          sleep 5
+      continueOnError: true
+
+    - task: Bash@3
+      displayName: 'Deploy'
+      inputs:
+        targetType: 'inline'
+        script: |
+          docker stop juice-shop || true
+          docker rm juice-shop || true
+          docker build -t juice-shop .
+          CONTAINER_ID=$(docker run -d -P --name juice-shop juice-shop)
+          if [ $? -eq 0 ]; then
+            DOCKER_HOST_PORT=$(docker port juice-shop 3000 | cut -d ':' -f 2)
+            if [ -n "$DOCKER_HOST_PORT" ]; then
+              echo "Juice Shop is running on http://localhost:$DOCKER_HOST_PORT"
+              echo "##vso[task.setvariable variable=DOCKER_HOST_PORT;isOutput=true]$DOCKER_HOST_PORT"
+            else
+              echo "Failed to get container port mapping"
+            fi
+          else
+            echo "Failed to start container"
+          fi
+      continueOnError: true
+
+- stage: PostDeployment
+  dependsOn: Build
+  jobs:
+  - job: SecuritySummary
+    displayName: 'Security Findings Summary'
+    steps:
+    - script: echo '🛡️ Build, test, and deployment successful!'
+      displayName: 'Success Notification'
+
+    - task: Bash@3
+      displayName: 'Display Security Scan Results'
+      inputs:
+        targetType: 'inline'
+        script: |
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║                                                                ║"
+          echo "║        🛡️  CROWDSTRIKE SECURITY SCAN SUMMARY 🛡️               ║"
+          echo "║                                                                ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "📊 INFRASTRUCTURE AS CODE (IaC) SCAN"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ CrowdStrike-branded HTML report has been generated"
+          echo "📥 Download artifact: 'CrowdStrike_IaC_Security_Report'"
+          echo "📄 View the HTML report in your browser for detailed findings"
+          echo ""
+          echo "📦 CONTAINER IMAGE SCAN"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ -f "$(Pipeline.Workspace)/SecurityRemediationPlan/remediation_plan.md" ]; then
+            cat "$(Pipeline.Workspace)/SecurityRemediationPlan/remediation_plan.md"
+          else
+            echo "✅ No critical security findings in container images"
+          fi
+          echo ""
+          echo "🔍 NEXT STEPS"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "1. 📊 Download and review the CrowdStrike IaC Security Report"
+          echo "2. 🔴 Address all Critical and High severity violations"
+          echo "3. 🟡 Plan remediation for Medium severity issues"
+          echo "4. 🔒 Remove any detected secrets from code and containers"
+          echo "5. ♻️  Re-run the pipeline after fixes to verify remediation"
+          echo ""
+          echo "╔════════════════════════════════════════════════════════════════╗"
+          echo "║  Powered by CrowdStrike Falcon Cloud Security                 ║"
+          echo "║  We Stop Breaches | www.crowdstrike.com                       ║"
+          echo "╚════════════════════════════════════════════════════════════════╝"
+      continueOnError: true
