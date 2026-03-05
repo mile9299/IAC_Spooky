@@ -101,19 +101,23 @@ stages:
               echo "Successfully processed SARIF file to results.sarif"
             else
               echo "SARIF file not found in scan output, creating a minimal valid SARIF file"
-              echo '{
-                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-                "version": "2.1.0",
-                "runs": [{"tool": {"driver": {"name": "CrowdStrike Falcon", "informationUri": "https://www.crowdstrike.com", "rules": []}}, "results": []}]
-              }' > $(Build.SourcesDirectory)/results.sarif
+              cat > $(Build.SourcesDirectory)/results.sarif << 'EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "CrowdStrike Falcon", "informationUri": "https://www.crowdstrike.com", "rules": []}}, "results": []}]
+          }
+          EOF
             fi
           else
             echo "Scan summary file not found, creating a minimal valid SARIF file"
-            echo '{
-              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-              "version": "2.1.0",
-              "runs": [{"tool": {"driver": {"name": "CrowdStrike Falcon", "informationUri": "https://www.crowdstrike.com", "rules": []}}, "results": []}]
-            }' > $(Build.SourcesDirectory)/results.sarif
+            cat > $(Build.SourcesDirectory)/results.sarif << 'EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "CrowdStrike Falcon", "informationUri": "https://www.crowdstrike.com", "rules": []}}, "results": []}]
+          }
+          EOF
           fi
       continueOnError: true
 
@@ -158,7 +162,7 @@ stages:
             exit 1
           fi
 
-          cat > generate_iac_report.py << 'PYTHON_SCRIPT'
+          cat > generate_iac_report.py << 'PYTHON_SCRIPT_END'
           #!/usr/bin/env python3
           import json
           import subprocess
@@ -278,26 +282,27 @@ stages:
               top_services = service_counts.most_common(10)
               max_service_count = top_services[0][1] if top_services else 1
 
-              html = f"""<!DOCTYPE html>
+              html_parts = []
+              html_parts.append("""<!DOCTYPE html>
           <html lang="en">
           <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <title>CrowdStrike Falcon Cloud Security - IaC Scan Report</title>
               <style>
-                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                  body {{
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
                       font-family: 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
                       background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
                       color: #C9D1D9;
                       line-height: 1.6;
                       min-height: 100vh;
                       padding: 20px;
-                  }}
+                  }
 
-                  .container {{ max-width: 1400px; margin: 0 auto; }}
+                  .container { max-width: 1400px; margin: 0 auto; }
 
-                  .header {{
+                  .header {
                       background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
                       color: white;
                       padding: 40px;
@@ -306,9 +311,9 @@ stages:
                       box-shadow: 0 8px 16px rgba(224, 31, 39, 0.3);
                       position: relative;
                       overflow: hidden;
-                  }}
+                  }
 
-                  .header::before {{
+                  .header::before {
                       content: '';
                       position: absolute;
                       top: -50%;
@@ -317,36 +322,36 @@ stages:
                       height: 500px;
                       background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
                       border-radius: 50%;
-                  }}
+                  }
 
-                  .header-content {{ position: relative; z-index: 1; }}
+                  .header-content { position: relative; z-index: 1; }
 
-                  .logo-section {{
+                  .logo-section {
                       display: flex;
                       align-items: center;
                       margin-bottom: 20px;
-                  }}
+                  }
 
-                  .logo {{
+                  .logo {
                       font-size: 48px;
                       margin-right: 15px;
                       filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-                  }}
+                  }
 
-                  .header h1 {{
+                  .header h1 {
                       font-size: 36px;
                       font-weight: 700;
                       margin-bottom: 8px;
                       text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                  }}
+                  }
 
-                  .header .subtitle {{
+                  .header .subtitle {
                       font-size: 18px;
                       opacity: 0.95;
                       font-weight: 400;
-                  }}
+                  }
 
-                  .pipeline-badge {{
+                  .pipeline-badge {
                       display: inline-flex;
                       align-items: center;
                       background: rgba(255,255,255,0.15);
@@ -355,55 +360,55 @@ stages:
                       font-size: 13px;
                       margin-top: 15px;
                       backdrop-filter: blur(10px);
-                  }}
+                  }
 
-                  .pipeline-badge strong {{ margin-left: 5px; }}
+                  .pipeline-badge strong { margin-left: 5px; }
 
-                  .services-widget {{
+                  .services-widget {
                       background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
                       padding: 30px;
                       border-radius: 12px;
                       margin-bottom: 30px;
                       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                       border-left: 5px solid #E01F27;
-                  }}
+                  }
 
-                  .services-widget h2 {{
+                  .services-widget h2 {
                       color: #E01F27;
                       font-size: 24px;
                       margin-bottom: 25px;
                       display: flex;
                       align-items: center;
                       gap: 10px;
-                  }}
+                  }
 
-                  .service-bar-container {{
+                  .service-bar-container {
                       margin-bottom: 20px;
-                  }}
+                  }
 
-                  .service-header {{
+                  .service-header {
                       display: flex;
                       justify-content: space-between;
                       align-items: center;
                       margin-bottom: 8px;
-                  }}
+                  }
 
-                  .service-name {{
+                  .service-name {
                       font-size: 14px;
                       font-weight: 600;
                       color: #C9D1D9;
-                  }}
+                  }
 
-                  .service-count {{
+                  .service-count {
                       font-size: 14px;
                       font-weight: 700;
                       color: #E01F27;
                       background: rgba(224, 31, 39, 0.1);
                       padding: 4px 12px;
                       border-radius: 12px;
-                  }}
+                  }
 
-                  .service-bar-track {{
+                  .service-bar-track {
                       width: 100%;
                       height: 28px;
                       background: #0D1117;
@@ -411,9 +416,9 @@ stages:
                       overflow: hidden;
                       position: relative;
                       box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-                  }}
+                  }
 
-                  .service-bar-fill {{
+                  .service-bar-fill {
                       height: 100%;
                       background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
                       border-radius: 14px;
@@ -423,9 +428,9 @@ stages:
                       justify-content: flex-end;
                       padding-right: 12px;
                       box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
-                  }}
+                  }
 
-                  .service-bar-fill::after {{
+                  .service-bar-fill::after {
                       content: '';
                       position: absolute;
                       top: 0;
@@ -434,157 +439,129 @@ stages:
                       bottom: 0;
                       background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
                       animation: shimmer 2s infinite;
-                  }}
+                  }
 
-                  @keyframes shimmer {{
-                      0% {{ transform: translateX(-100%); }}
-                      100% {{ transform: translateX(100%); }}
-                  }}
+                  @keyframes shimmer {
+                      0% { transform: translateX(-100%); }
+                      100% { transform: translateX(100%); }
+                  }
 
-                  .service-percentage {{
+                  .service-percentage {
                       font-size: 11px;
                       font-weight: 700;
                       color: white;
                       text-shadow: 0 1px 2px rgba(0,0,0,0.3);
                       z-index: 1;
-                  }}
+                  }
 
-                  .status-banner {{
-                      background: linear-gradient(135deg, {status_color} 0%, {status_color}dd 100%);
-                      color: white;
-                      padding: 20px 30px;
-                      border-radius: 10px;
-                      margin-bottom: 30px;
-                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                      display: flex;
-                      align-items: center;
-                      justify-content: space-between;
-                  }}
-
-                  .status-content {{
-                      display: flex;
-                      align-items: center;
-                      gap: 15px;
-                  }}
-
-                  .status-icon {{ font-size: 36px; }}
-
-                  .status-text h2 {{
-                      font-size: 24px;
-                      font-weight: 700;
-                      margin-bottom: 5px;
-                  }}
-
-                  .status-text p {{ opacity: 0.9; font-size: 14px; }}
-
-                  .executive-summary {{
+                  .executive-summary {
                       background: #161B22;
                       padding: 30px;
                       border-radius: 12px;
                       border-left: 5px solid #E01F27;
                       margin-bottom: 30px;
                       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                  }}
+                  }
 
-                  .executive-summary h2 {{
+                  .executive-summary h2 {
                       color: #E01F27;
                       font-size: 24px;
                       margin-bottom: 25px;
                       display: flex;
                       align-items: center;
                       gap: 10px;
-                  }}
+                  }
 
-                  .summary-grid {{
+                  .summary-grid {
                       display: grid;
                       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                       gap: 20px;
-                  }}
+                  }
 
-                  .stat-card {{
+                  .stat-card {
                       background: linear-gradient(135deg, #0D1117 0%, #1C2128 100%);
                       padding: 20px;
                       border-radius: 10px;
                       border: 1px solid #30363D;
                       transition: transform 0.2s, box-shadow 0.2s;
-                  }}
+                  }
 
-                  .stat-card:hover {{
+                  .stat-card:hover {
                       transform: translateY(-2px);
                       box-shadow: 0 6px 16px rgba(224, 31, 39, 0.2);
-                  }}
+                  }
 
-                  .stat-label {{
+                  .stat-label {
                       color: #8B949E;
                       font-size: 11px;
                       text-transform: uppercase;
                       letter-spacing: 1px;
                       margin-bottom: 10px;
                       font-weight: 600;
-                  }}
+                  }
 
-                  .stat-value {{
+                  .stat-value {
                       font-size: 32px;
                       font-weight: 700;
                       color: #C9D1D9;
-                  }}
+                  }
 
-                  .stat-value.critical {{ color: #E01F27; }}
+                  .stat-value.critical { color: #E01F27; }
 
-                  .severity-section {{
+                  .severity-section {
                       display: grid;
                       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
                       gap: 20px;
                       margin-bottom: 30px;
-                  }}
+                  }
 
-                  .severity-card {{
+                  .severity-card {
                       background: #161B22;
                       padding: 30px;
                       border-radius: 12px;
                       border-left: 5px solid;
                       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                       transition: transform 0.2s;
-                  }}
+                  }
 
-                  .severity-card:hover {{ transform: translateY(-4px); }}
+                  .severity-card:hover { transform: translateY(-4px); }
 
-                  .severity-card.critical {{ border-left-color: #E01F27; }}
-                  .severity-card.high {{ border-left-color: #FF3D3D; }}
-                  .severity-card.medium {{ border-left-color: #FF6B00; }}
-                  .severity-card.low {{ border-left-color: #FFC107; }}
+                  .severity-card.critical { border-left-color: #E01F27; }
+                  .severity-card.high { border-left-color: #FF3D3D; }
+                  .severity-card.medium { border-left-color: #FF6B00; }
+                  .severity-card.low { border-left-color: #FFC107; }
 
-                  .severity-card h3 {{
+                  .severity-card h3 {
                       color: #8B949E;
                       font-size: 13px;
                       text-transform: uppercase;
                       letter-spacing: 1px;
                       margin-bottom: 15px;
                       font-weight: 600;
-                  }}
+                  }
 
-                  .severity-card .value {{
+                  .severity-card .value {
                       font-size: 48px;
                       font-weight: 700;
                       color: #C9D1D9;
                       line-height: 1;
                       margin-bottom: 10px;
-                  }}
+                  }
 
-                  .severity-card .subtext {{
+                  .severity-card .subtext {
                       color: #8B949E;
                       font-size: 12px;
-                  }}
+                  }
 
-                  .section {{
+                  .section {
                       background: #161B22;
                       padding: 30px;
                       border-radius: 12px;
                       margin-bottom: 25px;
                       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                  }}
+                  }
 
-                  .section h2 {{
+                  .section h2 {
                       color: #E01F27;
                       font-size: 22px;
                       margin-bottom: 20px;
@@ -593,16 +570,16 @@ stages:
                       display: flex;
                       align-items: center;
                       gap: 10px;
-                  }}
+                  }
 
-                  table {{
+                  table {
                       width: 100%;
                       border-collapse: collapse;
                       margin: 20px 0;
                       font-size: 13px;
-                  }}
+                  }
 
-                  th {{
+                  th {
                       background: #0D1117;
                       color: #8B949E;
                       padding: 15px;
@@ -612,16 +589,16 @@ stages:
                       font-size: 11px;
                       letter-spacing: 1px;
                       border-bottom: 2px solid #30363D;
-                  }}
+                  }
 
-                  td {{
+                  td {
                       padding: 15px;
                       border-bottom: 1px solid #21262D;
-                  }}
+                  }
 
-                  tr:hover {{ background: rgba(224, 31, 39, 0.05); }}
+                  tr:hover { background: rgba(224, 31, 39, 0.05); }
 
-                  .severity-badge {{
+                  .severity-badge {
                       display: inline-block;
                       padding: 6px 14px;
                       border-radius: 20px;
@@ -629,14 +606,14 @@ stages:
                       font-weight: 700;
                       text-transform: uppercase;
                       letter-spacing: 0.5px;
-                  }}
+                  }
 
-                  .severity-critical {{ background: #E01F27; color: white; }}
-                  .severity-high {{ background: #FF3D3D; color: white; }}
-                  .severity-medium {{ background: #FF6B00; color: white; }}
-                  .severity-low {{ background: #FFC107; color: #000; }}
+                  .severity-critical { background: #E01F27; color: white; }
+                  .severity-high { background: #FF3D3D; color: white; }
+                  .severity-medium { background: #FF6B00; color: white; }
+                  .severity-low { background: #FFC107; color: #000; }
 
-                  .platform-badge {{
+                  .platform-badge {
                       display: inline-block;
                       padding: 4px 10px;
                       border-radius: 4px;
@@ -644,9 +621,9 @@ stages:
                       font-weight: 600;
                       background: #238636;
                       color: white;
-                  }}
+                  }
 
-                  .footer {{
+                  .footer {
                       background: #0D1117;
                       padding: 30px;
                       border-radius: 12px;
@@ -654,23 +631,23 @@ stages:
                       color: #6E7681;
                       margin-top: 40px;
                       border-top: 3px solid #E01F27;
-                  }}
+                  }
 
-                  .footer p {{ margin: 8px 0; font-size: 13px; }}
-                  .footer strong {{ color: #C9D1D9; }}
+                  .footer p { margin: 8px 0; font-size: 13px; }
+                  .footer strong { color: #C9D1D9; }
 
-                  .cs-logo-text {{
+                  .cs-logo-text {
                       font-size: 18px;
                       color: #E01F27;
                       font-weight: 700;
                       margin-bottom: 10px;
-                  }}
+                  }
 
-                  @media (max-width: 768px) {{
-                      .header h1 {{ font-size: 28px; }}
-                      .severity-section {{ grid-template-columns: 1fr; }}
-                      .summary-grid {{ grid-template-columns: 1fr; }}
-                  }}
+                  @media (max-width: 768px) {
+                      .header h1 { font-size: 28px; }
+                      .severity-section { grid-template-columns: 1fr; }
+                      .summary-grid { grid-template-columns: 1fr; }
+                  }
               </style>
           </head>
           <body>
@@ -684,6 +661,9 @@ stages:
                                   <div class="subtitle">Infrastructure as Code Security Scan Report</div>
                               </div>
                           </div>
+          """)
+              
+              html_parts.append(f"""
                           <div class="pipeline-badge">
                               🔄 <strong>Pipeline:</strong> {pipeline_name} | <strong>Build:</strong> #{build_number}
                           </div>
@@ -692,11 +672,11 @@ stages:
 
                   <div class="services-widget">
                       <h2>📊 Top Detections by Service</h2>
-          """
+              """)
 
               for i, (service, count) in enumerate(top_services, 1):
                   percentage = (count / max_service_count) * 100
-                  html += f"""
+                  html_parts.append(f"""
                       <div class="service-bar-container">
                           <div class="service-header">
                               <span class="service-name">#{i} {service}</span>
@@ -708,9 +688,9 @@ stages:
                               </div>
                           </div>
                       </div>
-                  """
+                  """)
 
-              html += f"""
+              html_parts.append(f"""
                   </div>
 
                   <div class="executive-summary">
@@ -805,7 +785,7 @@ stages:
                               </tr>
                           </thead>
                           <tbody>
-          """
+              """)
 
               sorted_rules = sorted(by_rule.items(), key=lambda x: len(x[1]), reverse=True)[:20]
 
@@ -816,7 +796,7 @@ stages:
                   platform = rule.get('platform', 'Unknown')
                   service = rule.get('service', 'Unknown')
 
-                  html += f"""
+                  html_parts.append(f"""
                               <tr>
                                   <td><span class="severity-badge severity-{severity_name}">{severity_name.upper()}</span></td>
                                   <td><strong>{rule_name}</strong></td>
@@ -824,9 +804,9 @@ stages:
                                   <td>{service}</td>
                                   <td><strong>{len(dets)}</strong></td>
                               </tr>
-                  """
+                  """)
 
-              html += """
+              html_parts.append("""
                           </tbody>
                       </table>
                   </div>
@@ -846,7 +826,7 @@ stages:
                               </tr>
                           </thead>
                           <tbody>
-          """
+              """)
 
               for project_name, dets in sorted(by_project.items(), key=lambda x: len(x[1]), reverse=True):
                   project_sev = Counter()
@@ -857,7 +837,7 @@ stages:
 
                   files_count = len(set(d.get('file_name', '') for d in dets))
 
-                  html += f"""
+                  html_parts.append(f"""
                               <tr>
                                   <td><strong>{project_name}</strong></td>
                                   <td><strong>{len(dets)}</strong></td>
@@ -867,9 +847,9 @@ stages:
                                   <td>{project_sev.get('Medium', 0)}</td>
                                   <td>{project_sev.get('Low', 0)}</td>
                               </tr>
-                  """
+                  """)
 
-              html += f"""
+              html_parts.append(f"""
                           </tbody>
                       </table>
                   </div>
@@ -885,9 +865,9 @@ stages:
               </div>
           </body>
           </html>
-              """
+              """)
 
-              return html
+              return ''.join(html_parts)
 
           if __name__ == "__main__":
               print("🚀 Starting CrowdStrike IaC Report Generation...")
@@ -911,7 +891,7 @@ stages:
                   html_report = generate_html_report([])
                   with open('iac_security_report.html', 'w') as f:
                       f.write(html_report)
-          PYTHON_SCRIPT
+          PYTHON_SCRIPT_END
 
           export FALCON_CLIENT_ID="$(FALCON_CLIENT_ID)"
           export FALCON_CLIENT_SECRET="$(FALCON_CLIENT_SECRET)"
@@ -937,89 +917,89 @@ stages:
             echo "✅ Report found in current directory, moving to artifacts..."
             mv -v "iac_security_report.html" "$REPORT_FILE"
           else
-            echo "⚠️  Report not generated, creating placeholder DIRECTLY in artifact directory..."
-            cat > "$REPORT_FILE" << 'PLACEHOLDER'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>CrowdStrike IaC Report - Not Available</title>
-    <style>
-        body { 
-            font-family: 'Segoe UI', Arial, sans-serif; 
-            background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
-            color: #C9D1D9; 
-            padding: 40px;
-            margin: 0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #161B22;
-            border-radius: 12px;
-            padding: 40px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border-left: 5px solid #E01F27;
-        }
-        .header {
-            background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        h1 { margin: 0; font-size: 28px; }
-        h2 { color: #E01F27; margin: 20px 0; }
-        ul { 
-            background: #0D1117;
-            padding: 20px 40px;
-            border-radius: 8px;
-            line-height: 1.8;
-        }
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            color: #8B949E;
-            font-size: 13px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🛡️ CrowdStrike Falcon Cloud Security</h1>
-            <p>Infrastructure as Code Security Report</p>
-        </div>
-        
-        <h2>⚠️ Report Not Available</h2>
-        <p>The IaC security report could not be generated during this pipeline run.</p>
-        
-        <h3>Possible Reasons:</h3>
-        <ul>
-            <li>Falcon API credentials not configured in pipeline variables</li>
-            <li>No IaC detections found in the last scan</li>
-            <li>Network connectivity issues to Falcon API</li>
-            <li>Python script execution error</li>
-            <li>Insufficient API permissions</li>
-        </ul>
-        
-        <h3>How to Fix:</h3>
-        <ul>
-            <li>Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are set</li>
-            <li>Check the pipeline logs for detailed error messages</li>
-            <li>Ensure the Falcon API is accessible from Azure DevOps</li>
-            <li>Run an IaC scan using the FCS CLI tool first</li>
-        </ul>
-        
-        <div class="footer">
-            <p><strong>CrowdStrike Falcon Cloud Security</strong></p>
-            <p>Check pipeline logs for more details</p>
-        </div>
-    </div>
-</body>
-</html>
-PLACEHOLDER
+            echo "⚠️  Report not generated, creating placeholder..."
+            cat > "$REPORT_FILE" << 'PLACEHOLDER_END'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <title>CrowdStrike IaC Report - Not Available</title>
+              <style>
+                  body { 
+                      font-family: 'Segoe UI', Arial, sans-serif; 
+                      background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
+                      color: #C9D1D9; 
+                      padding: 40px;
+                      margin: 0;
+                  }
+                  .container {
+                      max-width: 800px;
+                      margin: 0 auto;
+                      background: #161B22;
+                      border-radius: 12px;
+                      padding: 40px;
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                      border-left: 5px solid #E01F27;
+                  }
+                  .header {
+                      background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
+                      color: white;
+                      padding: 20px;
+                      border-radius: 8px;
+                      margin-bottom: 30px;
+                      text-align: center;
+                  }
+                  h1 { margin: 0; font-size: 28px; }
+                  h2 { color: #E01F27; margin: 20px 0; }
+                  ul { 
+                      background: #0D1117;
+                      padding: 20px 40px;
+                      border-radius: 8px;
+                      line-height: 1.8;
+                  }
+                  .footer {
+                      margin-top: 30px;
+                      text-align: center;
+                      color: #8B949E;
+                      font-size: 13px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🛡️ CrowdStrike Falcon Cloud Security</h1>
+                      <p>Infrastructure as Code Security Report</p>
+                  </div>
+                  
+                  <h2>⚠️ Report Not Available</h2>
+                  <p>The IaC security report could not be generated during this pipeline run.</p>
+                  
+                  <h3>Possible Reasons:</h3>
+                  <ul>
+                      <li>Falcon API credentials not configured in pipeline variables</li>
+                      <li>No IaC detections found in the last scan</li>
+                      <li>Network connectivity issues to Falcon API</li>
+                      <li>Python script execution error</li>
+                      <li>Insufficient API permissions</li>
+                  </ul>
+                  
+                  <h3>How to Fix:</h3>
+                  <ul>
+                      <li>Verify FALCON_CLIENT_ID and FALCON_CLIENT_SECRET are set</li>
+                      <li>Check the pipeline logs for detailed error messages</li>
+                      <li>Ensure the Falcon API is accessible from Azure DevOps</li>
+                      <li>Run an IaC scan using the FCS CLI tool first</li>
+                  </ul>
+                  
+                  <div class="footer">
+                      <p><strong>CrowdStrike Falcon Cloud Security</strong></p>
+                      <p>Check pipeline logs for more details</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          PLACEHOLDER_END
             echo "✅ Placeholder report created at: $REPORT_FILE"
           fi
           
@@ -1032,8 +1012,7 @@ PLACEHOLDER
             echo "✅✅✅ SUCCESS: Report file exists at $REPORT_FILE"
             ls -lh "$REPORT_FILE"
           else
-            echo "❌❌❌ CRITICAL ERROR: File still not found after all attempts!"
-            echo "This should never happen. Creating emergency fallback..."
+            echo "❌❌❌ CRITICAL ERROR: File still not found!"
             echo "<html><body><h1>Error</h1></body></html>" > "$REPORT_FILE"
           fi
           
