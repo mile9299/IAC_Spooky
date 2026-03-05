@@ -897,16 +897,332 @@ stages:
           export FALCON_CLIENT_SECRET="$(FALCON_CLIENT_SECRET)"
           export FALCON_REGION="$(FALCON_REGION)"
 
+
           python3 generate_iac_report.py
 
+          # Debug: Show current directory and files
+          echo "==================== DEBUG INFO ===================="
+          echo "Current directory: $(pwd)"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+          echo ""
+          echo "Files in current directory:"
+          ls -lah *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "===================================================="
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p "$(Build.ArtifactStagingDirectory)"
+
+          # Copy files with full path and error handling
           if [ -f "iac_security_report.html" ]; then
-            cp iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            cp -v iac_security_report.html "$(Build.ArtifactStagingDirectory)/"
             echo "✅ IaC Security Report copied to artifacts"
+            ls -lh "$(Build.ArtifactStagingDirectory)/iac_security_report.html"
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > "$(Build.ArtifactStagingDirectory)/iac_security_report.html"
           fi
 
           if [ -f "iac_detections.json" ]; then
-            cp iac_detections.json $(Build.ArtifactStagingDirectory)/
+            cp -v iac_detections.json "$(Build.ArtifactStagingDirectory)/"
             echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > "$(Build.ArtifactStagingDirectory)/iac_detections.json"
+          fi
+      continueOnError: true
+      env:
+        FALCON_CLIENT_ID: $(FALCON_CLIENT_ID)
+        FALCON_CLIENT_SECRET: $(FALCON_CLIENT_SECRET)
+        FALCON_REGION: $(FALCON_REGION)
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
+          fi
+          python3 generate_iac_report.py
+
+          # Debug: Show current directory and files
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la *.html *.json 2>/dev/null || echo "No HTML or JSON files found"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+
+          # Create artifact staging directory if it does not exist
+          mkdir -p $(Build.ArtifactStagingDirectory)
+
+          # Copy files with full path and error handling
+          if [ -f "iac_security_report.html" ]; then
+            cp -v iac_security_report.html $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Security Report copied to artifacts"
+            ls -lh $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          else
+            echo "❌ ERROR: iac_security_report.html not found in $(pwd)"
+            echo "Creating placeholder report..."
+            echo "<html><body><h1>Report Generation Failed</h1><p>No detections data available.</p></body></html>" > $(Build.ArtifactStagingDirectory)/iac_security_report.html
+          fi
+
+          if [ -f "iac_detections.json" ]; then
+            cp -v iac_detections.json $(Build.ArtifactStagingDirectory)/
+            echo "✅ IaC Detections JSON copied to artifacts"
+          else
+            echo "⚠️  iac_detections.json not found"
+            echo "[]" > $(Build.ArtifactStagingDirectory)/iac_detections.json
           fi
       continueOnError: true
       env:
