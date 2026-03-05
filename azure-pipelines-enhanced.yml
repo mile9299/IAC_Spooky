@@ -929,15 +929,64 @@ stages:
 
           python3 generate_iac_report.py
 
-          if [ -f "iac_security_report.html" ]; then
-            cp iac_security_report.html $(Build.ArtifactStagingDirectory)/
-            echo "✅ IaC Security Report copied to artifacts"
+          # Capture the exit code
+          REPORT_EXIT_CODE=$?
+          
+          echo "==================== DEBUG OUTPUT ===================="
+          echo "Report generation exit code: $REPORT_EXIT_CODE"
+          echo "Current directory: $(pwd)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+          echo ""
+          echo "Files in current directory:"
+          ls -lah | grep -E '\.html|\.json' || echo "No HTML or JSON files found"
+          echo "======================================================="
+          
+          # Ensure artifact staging directory exists
+          mkdir -p "$(Build.ArtifactStagingDirectory)"
+          
+          # Always create the report file (even if generation failed)
+          if [ ! -f "iac_security_report.html" ]; then
+            echo "⚠️  Report file not found! Creating placeholder..."
+            cat > "iac_security_report.html" << 'PLACEHOLDER'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IaC Report - Generation Failed</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0D1117; color: #C9D1D9; padding: 40px; text-align: center; }
+        .error { background: #E01F27; color: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; }
+        h1 { margin: 0 0 15px 0; }
+        p { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="error">
+        <h1>🛡️ CrowdStrike IaC Report</h1>
+        <h2>Report Generation Failed</h2>
+        <p>The IaC security report could not be generated.</p>
+        <p><strong>Possible reasons:</strong></p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>Falcon API credentials not configured</li>
+            <li>No IaC detections found in last 30 days</li>
+            <li>API connection timeout</li>
+            <li>Python script error</li>
+        </ul>
+        <p style="margin-top: 20px;">Check pipeline logs for details.</p>
+    </div>
+</body>
+</html>
+PLACEHOLDER
+            echo "✅ Placeholder report created"
           fi
-
-          if [ -f "iac_detections.json" ]; then
-            cp iac_detections.json $(Build.ArtifactStagingDirectory)/
-            echo "✅ IaC Detections JSON copied to artifacts"
-          fi
+          
+          # Copy with verbose output
+          cp -v "iac_security_report.html" "$(Build.ArtifactStagingDirectory)/" && \
+            echo "✅ IaC Security Report copied to artifacts" || \
+            echo "❌ Failed to copy report to artifacts"
+          
+          # List artifact directory contents
+          echo "Artifact directory contents:"
+          ls -lh "$(Build.ArtifactStagingDirectory)/" || echo "Cannot list artifact directory"
       continueOnError: true
       env:
         FALCON_CLIENT_ID: $(FALCON_CLIENT_ID)
