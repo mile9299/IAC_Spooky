@@ -55,16 +55,17 @@ stages:
               exit 1
           else
               echo "Logging in to crowdstrike registry with username: $(CS_USERNAME)"
-              echo "$(CS_PASSWORD)" | docker login --username "$(CS_USERNAME)" --password-stdin
+              echo "$(CS_PASSWORD)" | docker login --username "$(CS_USERNAME)" --password-stdin "$(CS_REGISTRY)"
 
               if [ $? -eq 0 ]; then
                   echo "Docker login successful"
                   echo "Pulling fcs container target from crowdstrike"
-                  docker pull $(CS_IMAGE_NAME):$(CS_IMAGE_TAG)
+                  docker pull "$(CS_REGISTRY)/$(CS_IMAGE_NAME):$(CS_IMAGE_TAG)"
                   if [ $? -eq 0 ]; then
                       echo "fcs docker container image pulled successfully"
                       echo "=============== FCS IaC Scan Starts ==============="
-                      docker run --network=host --rm "$(CS_IMAGE_NAME)":"$(CS_IMAGE_TAG)" --client-id "$(FALCON_CLIENT_ID)" --client-secret "$(FALCON_CLIENT_SECRET)" --falcon-region "$(FALCON_REGION)" iac scan -p "$(PROJECT_PATH)" --upload-results  | tee $(Build.SourcesDirectory)/scansummary.txt
+                      docker run --network=host --rm "$(CS_REGISTRY)/$(CS_IMAGE_NAME):$(CS_IMAGE_TAG)" --client-id "$(FALCON_CLIENT_ID)" --client-secret "$(FALCON_CLIENT_SECRET)" --falcon-region "$(FALCON_REGION)" iac scan -p "$(PROJECT_PATH)" --upload-results  | tee $(Build.SourcesDirectory)/scansummary.txt
+                      scan_status=${PIPESTATUS[0]}
                       echo "=============== FCS IaC Scan Ends ==============="
                       echo "fcs-iac-scan-status: $scan_status"
                       if [ $scan_status -eq 40 ]; then
@@ -136,7 +137,6 @@ stages:
           fi
       continueOnError: true
 
-    # NEW: Generate Enhanced CrowdStrike-Branded IaC Security Report
     - task: UsePythonVersion@0
       displayName: 'Use Python 3.x'
       inputs:
@@ -242,6 +242,16 @@ stages:
               cloud_counts = Counter(det.get('rule', {}).get('cloud_provider', 'Unknown') for det in detections)
               service_counts = Counter(det.get('rule', {}).get('service', 'Unknown') for det in detections)
 
+              # Determine status color based on severity
+              if severity_counts.get('Critical', 0) > 0:
+                  status_color = '#E01F27'
+              elif severity_counts.get('High', 0) > 0:
+                  status_color = '#FF3D3D'
+              elif severity_counts.get('Medium', 0) > 0:
+                  status_color = '#FF6B00'
+              else:
+                  status_color = '#238636'
+
               if detections:
                   dates = [det.get('last_detected', '') for det in detections if det.get('last_detected')]
                   if dates:
@@ -287,7 +297,6 @@ stages:
 
                   .container {{ max-width: 1400px; margin: 0 auto; }}
 
-                  /* Header with CrowdStrike Branding */
                   .header {{
                       background: linear-gradient(135deg, #E01F27 0%, #B01419 100%);
                       color: white;
@@ -349,7 +358,7 @@ stages:
                   }}
 
                   .pipeline-badge strong {{ margin-left: 5px; }}
-                  /* Top Services Widget */
+
                   .services-widget {{
                       background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
                       padding: 30px;
@@ -440,8 +449,6 @@ stages:
                       z-index: 1;
                   }}
 
-
-                  /* Status Banner */
                   .status-banner {{
                       background: linear-gradient(135deg, {status_color} 0%, {status_color}dd 100%);
                       color: white;
@@ -470,7 +477,6 @@ stages:
 
                   .status-text p {{ opacity: 0.9; font-size: 14px; }}
 
-                  /* Executive Summary */
                   .executive-summary {{
                       background: #161B22;
                       padding: 30px;
@@ -525,7 +531,6 @@ stages:
 
                   .stat-value.critical {{ color: #E01F27; }}
 
-                  /* Severity Cards */
                   .severity-section {{
                       display: grid;
                       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -571,7 +576,6 @@ stages:
                       font-size: 12px;
                   }}
 
-                  /* Section Styling */
                   .section {{
                       background: #161B22;
                       padding: 30px;
@@ -591,7 +595,6 @@ stages:
                       gap: 10px;
                   }}
 
-                  /* Table Styling */
                   table {{
                       width: 100%;
                       border-collapse: collapse;
@@ -618,7 +621,6 @@ stages:
 
                   tr:hover {{ background: rgba(224, 31, 39, 0.05); }}
 
-                  /* Severity Badges */
                   .severity-badge {{
                       display: inline-block;
                       padding: 6px 14px;
@@ -634,7 +636,6 @@ stages:
                   .severity-medium {{ background: #FF6B00; color: white; }}
                   .severity-low {{ background: #FFC107; color: #000; }}
 
-                  /* Platform Badge */
                   .platform-badge {{
                       display: inline-block;
                       padding: 4px 10px;
@@ -645,7 +646,6 @@ stages:
                       color: white;
                   }}
 
-                  /* Footer */
                   .footer {{
                       background: #0D1117;
                       padding: 30px;
@@ -666,102 +666,15 @@ stages:
                       margin-bottom: 10px;
                   }}
 
-                  /* Responsive */
                   @media (max-width: 768px) {{
                       .header h1 {{ font-size: 28px; }}
                       .severity-section {{ grid-template-columns: 1fr; }}
                       .summary-grid {{ grid-template-columns: 1fr; }}
                   }}
-
-        /* Top Services Widget */
-        .services-widget {
-            background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
-            padding: 30px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border-left: 5px solid #E01F27;
-        }
-
-        .services-widget h2 {
-            color: #E01F27;
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .service-bar-container {
-            margin-bottom: 20px;
-        }
-
-        .service-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-
-        .service-name {
-            color: #C9D1D9;
-            font-weight: 600;
-        }
-
-        .service-count {
-            color: #8B949E;
-        }
-
-        .service-bar-track {
-            background: #0D1117;
-            height: 28px;
-            border-radius: 14px;
-            overflow: hidden;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-            position: relative;
-        }
-
-        .service-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
-            border-radius: 14px;
-            transition: width 1s ease-out;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            padding-right: 12px;
-            box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .service-bar-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        .service-percentage {
-            color: white;
-            font-weight: 600;
-            font-size: 12px;
-            z-index: 1;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
               </style>
           </head>
           <body>
               <div class="container">
-                  <!-- CrowdStrike Branded Header -->
                   <div class="header">
                       <div class="header-content">
                           <div class="logo-section">
@@ -776,12 +689,11 @@ stages:
                           </div>
                       </div>
                   </div>
-                  <!-- Top Detections by Service Widget -->
+
                   <div class="services-widget">
                       <h2>📊 Top Detections by Service</h2>
           """
 
-              # Generate service bars
               for i, (service, count) in enumerate(top_services, 1):
                   percentage = (count / max_service_count) * 100
                   html += f"""
@@ -798,10 +710,9 @@ stages:
                       </div>
                   """
 
-              html += """
+              html += f"""
                   </div>
 
-                  <!-- Executive Summary -->
                   <div class="executive-summary">
                       <h2>📊 Executive Summary</h2>
                       <div class="summary-grid">
@@ -824,7 +735,6 @@ stages:
                       </div>
                   </div>
 
-                  <!-- Severity Cards -->
                   <div class="severity-section">
                       <div class="severity-card critical">
                           <h3>🔴 Critical Severity</h3>
@@ -848,7 +758,6 @@ stages:
                       </div>
                   </div>
 
-                  <!-- Scan Coverage -->
                   <div class="section">
                       <h2>📈 Scan Coverage & Statistics</h2>
                       <table>
@@ -883,7 +792,6 @@ stages:
                       </table>
                   </div>
 
-                  <!-- Top Violations -->
                   <div class="section">
                       <h2>🚨 Top 20 Most Common Violations</h2>
                       <table>
@@ -918,12 +826,11 @@ stages:
                               </tr>
                   """
 
-              html += f"""
+              html += """
                           </tbody>
                       </table>
                   </div>
 
-                  <!-- Projects Summary -->
                   <div class="section">
                       <h2>📁 Projects Summary</h2>
                       <table>
@@ -967,7 +874,6 @@ stages:
                       </table>
                   </div>
 
-                  <!-- CrowdStrike Footer -->
                   <div class="footer">
                       <div class="cs-logo-text">🛡️ CROWDSTRIKE FALCON CLOUD SECURITY</div>
                       <p><strong>Falcon Cloud Security (FCS)</strong> - Infrastructure as Code Security</p>
@@ -1002,7 +908,6 @@ stages:
                   print(f"📄 Data: iac_detections.json")
               else:
                   print("⚠️  No IaC detections found or API query failed")
-                  # Create empty report
                   html_report = generate_html_report([])
                   with open('iac_security_report.html', 'w') as f:
                       f.write(html_report)
@@ -1023,19 +928,15 @@ stages:
           ls -lh iac_detections.json 2>/dev/null || echo "JSON file NOT found"
           echo "======================================================="
           
-          # ALWAYS ensure artifact directory exists
           mkdir -p "$(Build.ArtifactStagingDirectory)"
           
-          # Strategy: Create the file DIRECTLY in artifact directory to guarantee it exists
           ARTIFACT_DIR="$(Build.ArtifactStagingDirectory)"
           REPORT_FILE="$ARTIFACT_DIR/iac_security_report.html"
           
-          # If report was generated in current dir, move it
           if [ -f "iac_security_report.html" ]; then
             echo "✅ Report found in current directory, moving to artifacts..."
             mv -v "iac_security_report.html" "$REPORT_FILE"
           else
-            # Create placeholder DIRECTLY in artifact directory
             echo "⚠️  Report not generated, creating placeholder DIRECTLY in artifact directory..."
             cat > "$REPORT_FILE" << 'PLACEHOLDER'
 <!DOCTYPE html>
@@ -1082,91 +983,6 @@ stages:
             color: #8B949E;
             font-size: 13px;
         }
-
-        /* Top Services Widget */
-        .services-widget {
-            background: linear-gradient(135deg, #161B22 0%, #1C2128 100%);
-            padding: 30px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border-left: 5px solid #E01F27;
-        }
-
-        .services-widget h2 {
-            color: #E01F27;
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .service-bar-container {
-            margin-bottom: 20px;
-        }
-
-        .service-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-
-        .service-name {
-            color: #C9D1D9;
-            font-weight: 600;
-        }
-
-        .service-count {
-            color: #8B949E;
-        }
-
-        .service-bar-track {
-            background: #0D1117;
-            height: 28px;
-            border-radius: 14px;
-            overflow: hidden;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
-            position: relative;
-        }
-
-        .service-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #E01F27 0%, #FF3D3D 100%);
-            border-radius: 14px;
-            transition: width 1s ease-out;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            padding-right: 12px;
-            box-shadow: 0 2px 8px rgba(224, 31, 39, 0.5);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .service-bar-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        .service-percentage {
-            color: white;
-            font-weight: 600;
-            font-size: 12px;
-            z-index: 1;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
     </style>
 </head>
 <body>
@@ -1207,13 +1023,11 @@ PLACEHOLDER
             echo "✅ Placeholder report created at: $REPORT_FILE"
           fi
           
-          # Also handle JSON if it exists
           if [ -f "iac_detections.json" ]; then
             mv -v "iac_detections.json" "$ARTIFACT_DIR/"
             echo "✅ JSON data moved to artifacts"
           fi
           
-          # FINAL VERIFICATION - Absolutely confirm the file exists
           if [ -f "$REPORT_FILE" ]; then
             echo "✅✅✅ SUCCESS: Report file exists at $REPORT_FILE"
             ls -lh "$REPORT_FILE"
@@ -1265,8 +1079,7 @@ PLACEHOLDER
         script: |
           export FALCON_CLIENT_SECRET=$(FALCON_CLIENT_SECRET)
           export FALCON_CLIENT_ID=$(FALCON_CLIENT_ID)
-          pip3 install docker crowdstrike-falconpy
-          pip install retry
+          pip3 install docker crowdstrike-falconpy retry
           if [ ! -d container-image-scan ] ; then
             git clone https://github.com/crowdstrike/container-image-scan
           fi
@@ -1307,6 +1120,7 @@ PLACEHOLDER
       inputs:
         targetType: 'inline'
         script: |
+          cd juice-shop
           npm cache clean -f
           npm install
           nohup npm start > /dev/null 2>&1 &
@@ -1318,6 +1132,7 @@ PLACEHOLDER
       inputs:
         targetType: 'inline'
         script: |
+          cd juice-shop
           docker stop juice-shop || true
           docker rm juice-shop || true
           docker build -t juice-shop .
