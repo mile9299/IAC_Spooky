@@ -62,7 +62,7 @@ pipeline {
                                             --client-id "$CS_CLIENT_ID" \
                                             --client-secret "$CS_CLIENT_SECRET" \
                                             --falcon-region "$FALCON_REGION" \
-                                            fcs scan iac -p "$PROJECT_PATH" \
+                                            iac scan -p "$PROJECT_PATH" \
                                             --report-formats json \
                                             --output-path /reports/iac_scan_results.json || true
 
