@@ -45,7 +45,7 @@ pipeline {
                                 exit 1
                             else
                                 echo "Logging in to crowdstrike registry with username: $CS_USERNAME"
-                                echo "$CS_PASSWORD" | docker login --username "$CS_USERNAME" --password-stdin "$CS_REGISTRY"
+                                echo "$CS_PASSWORD" | docker login --username "$CS_USERNAME" --password-stdin
 
                                 if [ $? -eq 0 ]; then
                                     echo "Docker login successful"
