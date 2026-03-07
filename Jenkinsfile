@@ -15,7 +15,7 @@ pipeline {
         FALCON_CLIENT_ID = credentials('CS_CLIENT_ID')
         FALCON_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         FALCON_REGION = 'us-1'
-        PROJECT_PATH = 'git::https://github.com/hashicorp/terraform-guides.git'
+        PROJECT_PATH = 'git::git::https://github.com/EngineerBetter/iac-example.git'
         CONTAINER_REPO = 'juice-shop'
         CONTAINER_TAG = 'latest'
     }
