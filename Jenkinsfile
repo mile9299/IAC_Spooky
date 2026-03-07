@@ -6,7 +6,7 @@ pipeline {
         DOCKER_PORT = 3000
         SPECTRAL_DSN = credentials('SPECTRAL_DSN')
         CS_IMAGE_NAME = 'mile/cs-fcs'
-        CS_IMAGE_TAG = '2.1.0'
+        CS_IMAGE_TAG = '2.2.0'
         CS_CLIENT_ID = credentials('CS_CLIENT_ID')
         CS_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         CS_USERNAME = 'mile'
@@ -15,7 +15,7 @@ pipeline {
         FALCON_CLIENT_ID = credentials('CS_CLIENT_ID')
         FALCON_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         FALCON_REGION = 'us-1'
-        PROJECT_PATH = 'git::https://github.com/hashicorp/terraform-guides.git'
+        PROJECT_PATH = 'git::https://github.com/EngineerBetter/iac-example.git'
         CONTAINER_REPO = 'juice-shop'
         CONTAINER_TAG = 'latest'
     }
