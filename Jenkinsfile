@@ -11,7 +11,7 @@ pipeline {
         CS_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         CS_USERNAME = 'mile'
         CS_PASSWORD = credentials('CS_PASSWORD')
-        CS_REGISTRY = 'registry.crowdstrike.com'
+        CS_REGISTRY = 'hub.docker.com'
         FALCON_CLIENT_ID = credentials('CS_CLIENT_ID')
         FALCON_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         FALCON_REGION = 'us-1'
