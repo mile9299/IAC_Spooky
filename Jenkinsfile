@@ -11,7 +11,7 @@ pipeline {
         CS_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         CS_USERNAME = 'mile'
         CS_PASSWORD = credentials('CS_PASSWORD')
-        CS_REGISTRY = 'registry.crowdstrike.com'
+        CS_REGISTRY =
         FALCON_CLIENT_ID = credentials('CS_CLIENT_ID')
         FALCON_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         FALCON_REGION = 'us-1'
@@ -45,7 +45,7 @@ pipeline {
                                 exit 1
                             else
                                 echo "Logging in to crowdstrike registry with username: $CS_USERNAME"
-                                echo "$CS_PASSWORD" | docker login --username "$CS_USERNAME" --password-stdin "$CS_REGISTRY"
+                                echo "$CS_PASSWORD" | docker login --username "$CS_USERNAME" --password-stdin
 
                                 if [ $? -eq 0 ]; then
                                     echo "Docker login successful"
