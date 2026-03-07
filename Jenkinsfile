@@ -6,7 +6,7 @@ pipeline {
         DOCKER_PORT = 3000
         SPECTRAL_DSN = credentials('SPECTRAL_DSN')
         CS_IMAGE_NAME = 'mile/cs-fcs'
-        CS_IMAGE_TAG = '2.1.0'
+        CS_IMAGE_TAG = '2.2.0'
         CS_CLIENT_ID = credentials('CS_CLIENT_ID')
         CS_CLIENT_SECRET = credentials('CS_CLIENT_SECRET')
         CS_USERNAME = 'mile'
@@ -45,7 +45,7 @@ pipeline {
                                 exit 1
                             else
                                 echo "Logging in to crowdstrike registry with username: $CS_USERNAME"
-                                echo "$CS_PASSWORD" | docker login --username "$CS_USERNAME" --password-stdin "$CS_REGISTRY"
+                                echo "$CS_PASSWORD" | docker login --username "$CS_USERNAME" --password-stdin
 
                                 if [ $? -eq 0 ]; then
                                     echo "Docker login successful"
