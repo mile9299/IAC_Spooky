@@ -261,7 +261,7 @@ def generate_iac_report():
 <html><head><meta charset="UTF-8"><title>CrowdStrike IaC Assessment</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#000000;color:#fff;padding:0;min-height:100vh}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#27262c;color:#a6acb0;padding:0;min-height:100vh}
 .brand-bar{background:linear-gradient(135deg,#E01F27 0%,#B71C1C 100%);height:8px}
 .container{max-width:1400px;margin:0 auto;padding:30px}
 .header{background:linear-gradient(135deg,#1a1a1a 0%,#0a0a0a 100%);color:white;padding:40px;border-radius:8px;margin-bottom:30px;border:1px solid #E01F27;box-shadow:0 4px 20px rgba(224,31,39,0.3)}
