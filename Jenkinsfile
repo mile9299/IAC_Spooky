@@ -298,7 +298,7 @@ tr:hover{background:#222}
 <div class="container">
 <div class="header">
 <div class="header-top">
-<div><span class="falcon-icon">🦅</span><span class="logo">CROWDSTRIKE</span><span class="logo-text">Falcon Cloud Security</span></div>
+<div><span class="falcon-icon">🦅</span><span class="logo"><b>CROWDSTRIKE</span><br><span class="logo-text">Falcon Cloud Security</b></span></div>
 </div>
 <h1>Infrastructure as Code Security Assessment</h1>
 <div class="header-meta">
