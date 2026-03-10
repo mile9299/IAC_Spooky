@@ -458,7 +458,7 @@ DOCKEREOF
                 script {
                     try {
                         withCredentials([usernameColonPassword(credentialsId: 'CRWD', variable: 'FALCON_CREDENTIALS')]) {
-                            crowdStrikeSecurity imageName: 'juice-shop', imageTag: 'latest', enforce: false, timeout: 60
+                            crowdStrikeSecurity imageName: 'juice-shop', imageTag: 'latest', enforce: true, timeout: 60
                         }
                     } catch (Exception e) {
                         echo "Image scan had issues: ${e.message}"
